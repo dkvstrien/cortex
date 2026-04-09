@@ -10,7 +10,7 @@ from typing import Any
 from cortex.curated import remember
 
 
-VALID_TYPES = {"decision", "preference", "procedure", "entity", "fact", "idea"}
+VALID_TYPES = {"decision", "preference", "procedure", "entity", "fact", "idea", "insight"}
 
 EXTRACTION_PROMPT_TEMPLATE = """\
 You are a memory extraction agent. Below are raw text chunks from various sources.

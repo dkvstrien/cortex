@@ -26,7 +26,7 @@ PRAGMA journal_mode=WAL;
 CREATE TABLE IF NOT EXISTS curated_memories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     content TEXT NOT NULL,
-    type TEXT NOT NULL CHECK(type IN ('decision', 'preference', 'procedure', 'entity', 'fact', 'idea')),
+    type TEXT NOT NULL CHECK(type IN ('decision', 'preference', 'procedure', 'entity', 'fact', 'idea', 'insight')),
     source TEXT,
     tags TEXT DEFAULT '[]',  -- JSON array
     confidence REAL DEFAULT 1.0,

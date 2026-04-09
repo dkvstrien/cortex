@@ -268,7 +268,7 @@
       "id": 18,
       "name": "Supersede MCP tool and proactive CLAUDE.md instructions",
       "description": "Expose supersede() as a 5th MCP tool in server.py. Also create a CLAUDE.md at the project root with instructions for Claude to proactively use Cortex tools.",
-      "status": "in_progress",
+      "status": "done",
       "acceptance_criteria": [
         "server.py exposes exactly 5 tools: remember, recall, forget, supersede, status",
         "The supersede MCP tool accepts old_id (int), new_content (str), and optional type (str)",
@@ -277,13 +277,14 @@
         "A CLAUDE.md exists at /Users/danielvanstrien/Projects/cortex/CLAUDE.md",
         "CLAUDE.md instructs Claude to: (a) call remember for decisions/preferences/facts, (b) call recall before answering questions about user history, (c) call supersede when information changes, (d) call status periodically",
         "A test in tests/test_server.py covers the supersede tool end-to-end"
-      ]
+      ],
+      "sprint_completed": 5
     },
     {
       "id": 19,
       "name": "Reflect pipeline: insight synthesis from curated memories",
       "description": "A new `reflect` subcommand for `python -m cortex`. Groups curated memories by type/topic, generates a Haiku prompt to synthesize patterns into higher-level insight memories, and writes them back with links to source IDs.",
-      "status": "pending",
+      "status": "in_progress",
       "acceptance_criteria": [
         "`python -m cortex reflect --db <path>` generates a reflection prompt and prints it to stdout",
         "The prompt groups curated memories by type and asks the LLM to identify patterns worth remembering as insights",
@@ -403,6 +404,6 @@
   "phase1_done": 14,
   "phase2_total": 12,
   "phase2_done": 0,
-  "done": 17,
+  "done": 18,
   "failed": 1
 }

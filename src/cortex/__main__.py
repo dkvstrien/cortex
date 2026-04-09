@@ -5,6 +5,7 @@ Usage:
     python -m cortex ingest <path> --source-type <type> [--db <path>]
     python -m cortex ingest-staging [--db <path>] [--staging-dir <dir>]
     python -m cortex extract [--scope recent|all] [--process] [--db <path>]
+    python -m cortex reflect [--process] [--db <path>]
     python -m cortex migrate <path> [--db <path>]
     python -m cortex status [--db <path>]
     python -m cortex --version
@@ -98,6 +99,16 @@ def main() -> None:
     )
     sp_extract.add_argument("--db", default=None, help="Path to Cortex database")
 
+    # reflect
+    sp_reflect = subparsers.add_parser(
+        "reflect", help="Synthesize insights from curated memories"
+    )
+    sp_reflect.add_argument(
+        "--process", action="store_true",
+        help="Read reflection JSON from stdin and process it into insight memories",
+    )
+    sp_reflect.add_argument("--db", default=None, help="Path to Cortex database")
+
     # migrate
     sp_migrate = subparsers.add_parser("migrate", help="Import MEMORY.md into curated layer")
     sp_migrate.add_argument("path", help="Path to MEMORY.md file")
@@ -121,6 +132,8 @@ def main() -> None:
         _cmd_ingest_staging(args)
     elif args.command == "extract":
         _cmd_extract(args)
+    elif args.command == "reflect":
+        _cmd_reflect(args)
     elif args.command == "migrate":
         _cmd_migrate(args)
     elif args.command == "status":
@@ -203,6 +216,33 @@ def _cmd_extract(args: argparse.Namespace) -> None:
         prompt = extract_prompt(conn, scope=args.scope)
         if prompt is None:
             print("No unextracted chunks found.", file=sys.stderr)
+            sys.exit(0)
+        print(prompt)
+
+    conn.close()
+
+
+def _cmd_reflect(args: argparse.Namespace) -> None:
+    from cortex.db import init_db
+    from cortex.reflect import reflect_prompt, process_reflection
+
+    db_path = _resolve_db(args.db)
+    conn = init_db(db_path)
+
+    if args.process:
+        raw_input = sys.stdin.read().strip()
+        if not raw_input:
+            print("No input received on stdin", file=sys.stderr)
+            sys.exit(1)
+        result = process_reflection(conn, raw_input)
+        print(
+            f"{result['insights_created']} insights created, "
+            f"{result['source_ids_tracked']} source IDs tracked"
+        )
+    else:
+        prompt = reflect_prompt(conn)
+        if prompt is None:
+            print("No unreflected memories found.", file=sys.stderr)
             sys.exit(0)
         print(prompt)
 
