@@ -14,6 +14,7 @@ Usage:
     python -m cortex export [--db <path>]
     python -m cortex import [--db <path>] < memories.json
     python -m cortex install
+    python -m cortex doctor [--db PATH] [--remote <ssh-host>]
     python -m cortex --version
 """
 
@@ -156,6 +157,14 @@ def main() -> None:
     # install
     subparsers.add_parser("install", help="Set up Cortex for a new user (idempotent)")
 
+    # doctor
+    sp_doctor = subparsers.add_parser("doctor", help="Run health checks and diagnostics")
+    sp_doctor.add_argument("--db", default=None, help="Path to Cortex database")
+    sp_doctor.add_argument(
+        "--remote", default=None, metavar="SSH_HOST",
+        help="SSH host to check for remote MCP server reachability",
+    )
+
     args = parser.parse_args()
 
     if args.command is None:
@@ -188,6 +197,8 @@ def main() -> None:
         _cmd_import(args)
     elif args.command == "install":
         _cmd_install(args)
+    elif args.command == "doctor":
+        _cmd_doctor(args)
 
 
 def _resolve_db(args_db: str | None) -> str:
@@ -402,6 +413,16 @@ def _cmd_install(args: argparse.Namespace) -> None:
     from cortex.install import main as install_main
 
     install_main()
+
+
+def _cmd_doctor(args: argparse.Namespace) -> None:
+    from pathlib import Path
+
+    from cortex.doctor import run_doctor
+
+    db_path = Path(args.db) if args.db else None
+    exit_code = run_doctor(db_path=db_path, remote=args.remote)
+    sys.exit(exit_code)
 
 
 if __name__ == "__main__":
