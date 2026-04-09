@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS curated_memories (
 -- FTS5 index on curated_memories content and tags (content-sync mode)
 CREATE VIRTUAL TABLE IF NOT EXISTS curated_memories_fts USING fts5(
     content,
+    type,
     tags,
     content=curated_memories,
     content_rowid=id
@@ -33,20 +34,20 @@ CREATE VIRTUAL TABLE IF NOT EXISTS curated_memories_fts USING fts5(
 
 -- Triggers to keep FTS in sync with curated_memories
 CREATE TRIGGER IF NOT EXISTS curated_memories_ai AFTER INSERT ON curated_memories BEGIN
-    INSERT INTO curated_memories_fts(rowid, content, tags)
-    VALUES (new.id, new.content, new.tags);
+    INSERT INTO curated_memories_fts(rowid, content, type, tags)
+    VALUES (new.id, new.content, new.type, new.tags);
 END;
 
 CREATE TRIGGER IF NOT EXISTS curated_memories_ad AFTER DELETE ON curated_memories BEGIN
-    INSERT INTO curated_memories_fts(curated_memories_fts, rowid, content, tags)
-    VALUES ('delete', old.id, old.content, old.tags);
+    INSERT INTO curated_memories_fts(curated_memories_fts, rowid, content, type, tags)
+    VALUES ('delete', old.id, old.content, old.type, old.tags);
 END;
 
 CREATE TRIGGER IF NOT EXISTS curated_memories_au AFTER UPDATE ON curated_memories BEGIN
-    INSERT INTO curated_memories_fts(curated_memories_fts, rowid, content, tags)
-    VALUES ('delete', old.id, old.content, old.tags);
-    INSERT INTO curated_memories_fts(rowid, content, tags)
-    VALUES (new.id, new.content, new.tags);
+    INSERT INTO curated_memories_fts(curated_memories_fts, rowid, content, type, tags)
+    VALUES ('delete', old.id, old.content, old.type, old.tags);
+    INSERT INTO curated_memories_fts(rowid, content, type, tags)
+    VALUES (new.id, new.content, new.type, new.tags);
 END;
 
 -- Raw chunks: unprocessed content from various sources

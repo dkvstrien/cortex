@@ -6,7 +6,7 @@
       "id": 1,
       "name": "Project scaffolding and SQLite schema",
       "description": "Set up Python project (pyproject.toml, src/cortex/, tests/). Create the full SQLite schema.",
-      "status": "in_progress",
+      "status": "done",
       "acceptance_criteria": [
         "Running pip install -e . from project root succeeds",
         "Importing from cortex.db import init_db works and creates a .db file with all tables",
@@ -16,7 +16,10 @@
         "meta table exists with key-value structure",
         "WAL mode is enabled on the database",
         "pytest runs with 0 errors"
-      ]
+      ],
+      "sprint_completed": 1
     }
-  ]
+  ],
+  "done": 1,
+  "in_progress": [2]
 }
