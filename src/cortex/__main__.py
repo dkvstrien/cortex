@@ -3,6 +3,7 @@
 Usage:
     python -m cortex server [--transport stdio|sse] [--port 8765]
     python -m cortex ingest <path> --source-type <type> [--db <path>]
+    python -m cortex ingest-staging [--db <path>] [--staging-dir <dir>]
     python -m cortex extract [--scope recent|all] [--process] [--db <path>]
     python -m cortex migrate <path> [--db <path>]
     python -m cortex status [--db <path>]
@@ -15,6 +16,7 @@ import argparse
 import logging
 import os
 import sys
+from pathlib import Path
 
 from cortex import __version__
 
@@ -71,6 +73,19 @@ def main() -> None:
     sp_ingest.add_argument("--max-tokens", type=int, default=300)
     sp_ingest.add_argument("--overlap", type=int, default=50)
 
+    # ingest-staging
+    _default_staging_dir = str(Path.home() / ".cortex" / "staging")
+    sp_ingest_staging = subparsers.add_parser(
+        "ingest-staging", help="Ingest JSONL staging files into raw chunks"
+    )
+    sp_ingest_staging.add_argument("--db", default=None, help="Path to Cortex database")
+    sp_ingest_staging.add_argument(
+        "--staging-dir", default=_default_staging_dir,
+        help=f"Directory containing .jsonl staging files (default: {_default_staging_dir})",
+    )
+    sp_ingest_staging.add_argument("--max-tokens", type=int, default=300)
+    sp_ingest_staging.add_argument("--overlap", type=int, default=50)
+
     # extract
     sp_extract = subparsers.add_parser("extract", help="Extract curated memories from raw chunks")
     sp_extract.add_argument(
@@ -102,6 +117,8 @@ def main() -> None:
         _cmd_server(args)
     elif args.command == "ingest":
         _cmd_ingest(args)
+    elif args.command == "ingest-staging":
+        _cmd_ingest_staging(args)
     elif args.command == "extract":
         _cmd_extract(args)
     elif args.command == "migrate":
@@ -143,6 +160,26 @@ def _cmd_ingest(args: argparse.Namespace) -> None:
     )
     print(f"{result['ingested']} chunks ingested, {result['skipped']} skipped")
     conn.close()
+
+
+def _cmd_ingest_staging(args: argparse.Namespace) -> None:
+    from cortex.db import init_db
+    from cortex.ingest_staging import ingest_staging
+
+    db_path = _resolve_db(args.db)
+    conn = init_db(db_path)
+    result = ingest_staging(
+        conn, args.staging_dir,
+        max_tokens=args.max_tokens,
+        overlap=args.overlap,
+    )
+    conn.close()
+    print(
+        f"{result['lines_processed']} lines processed, "
+        f"{result['chunks_stored']} chunks stored, "
+        f"{result['files_completed']} files completed, "
+        f"{result['files_skipped']} files skipped"
+    )
 
 
 def _cmd_extract(args: argparse.Namespace) -> None:
