@@ -55,3 +55,12 @@ def deserialize(blob: bytes) -> list[float]:
     """Unpack bytes back into a float vector."""
     (dim,) = struct.unpack_from("<I", blob, 0)
     return list(struct.unpack_from(f"<{dim}f", blob, 4))
+
+
+def serialize_vec(vector: list[float]) -> bytes:
+    """Pack a float vector into raw float32 bytes for sqlite-vec.
+
+    Unlike serialize(), this does NOT include a dimension prefix — sqlite-vec
+    expects raw little-endian float32 data.
+    """
+    return struct.pack(f"<{len(vector)}f", *vector)

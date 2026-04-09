@@ -5,6 +5,8 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+import sqlite_vec
+
 SCHEMA_SQL = """
 -- Enable WAL mode for concurrent reads
 PRAGMA journal_mode=WAL;
@@ -61,8 +63,7 @@ CREATE TABLE IF NOT EXISTS raw_chunks (
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
--- TODO: raw_chunks_vec (sqlite-vec virtual table on embeddings)
--- Will be created when sqlite-vec extension is loaded (Sprint 4).
+-- NOTE: raw_chunks_vec virtual table is created separately after sqlite-vec is loaded.
 
 -- Extractions: links raw chunks to curated memories
 CREATE TABLE IF NOT EXISTS extractions (
@@ -90,4 +91,14 @@ def init_db(path: str | Path) -> sqlite3.Connection:
 
     conn = sqlite3.connect(str(path))
     conn.executescript(SCHEMA_SQL)
+
+    # Load sqlite-vec extension and create the vector index table
+    conn.enable_load_extension(True)
+    sqlite_vec.load(conn)
+    conn.enable_load_extension(False)
+    conn.execute(
+        "CREATE VIRTUAL TABLE IF NOT EXISTS raw_chunks_vec "
+        "USING vec0(embedding float[384])"
+    )
+
     return conn

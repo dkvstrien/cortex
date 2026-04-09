@@ -38,7 +38,8 @@
       "id": 3,
       "name": "Embedding engine with fastembed",
       "description": "Create embeddings module wrapping fastembed with bge-small-en-v1.5. Provide embed_one(text) -> list[float] and embed_batch(texts) -> list[list[float]]. Model loaded lazily on first call. Include serialize/deserialize helpers for SQLite BLOB storage. No PyTorch dependency.",
-      "status": "in_progress",
+      "status": "done",
+      "sprint_completed": 3,
       "acceptance_criteria": [
         "embed_one('hello world') returns a list of 384 floats",
         "embed_batch(['a', 'b', 'c']) returns 3 vectors, each 384 floats",
@@ -51,7 +52,7 @@
       "id": 4,
       "name": "Raw layer: chunk storage and vector search",
       "description": "Implement the raw chunks layer. store_chunk(content, source, source_type, metadata) embeds the content, stores in raw_chunks with embedding BLOB, and indexes in sqlite-vec virtual table. recall_raw(query, source_type, limit) embeds the query, performs cosine similarity search via sqlite-vec, and returns ranked results.",
-      "status": "pending",
+      "status": "in_progress",
       "acceptance_criteria": [
         "store_chunk stores content with embedding and returns an ID",
         "recall_raw('database preference') finds semantically similar chunks",
@@ -206,6 +207,6 @@
     }
   ],
   "total": 14,
-  "done": 2,
+  "done": 3,
   "failed": 0
 }
