@@ -8,6 +8,7 @@ Usage:
     python -m cortex reflect [--process] [--db <path>]
     python -m cortex migrate <path> [--db <path>]
     python -m cortex status [--db <path>]
+    python -m cortex install
     python -m cortex --version
 """
 
@@ -118,6 +119,9 @@ def main() -> None:
     sp_status = subparsers.add_parser("status", help="Show health dashboard")
     sp_status.add_argument("--db", default=None, help="Path to Cortex database")
 
+    # install
+    subparsers.add_parser("install", help="Set up Cortex for a new user (idempotent)")
+
     args = parser.parse_args()
 
     if args.command is None:
@@ -138,6 +142,8 @@ def main() -> None:
         _cmd_migrate(args)
     elif args.command == "status":
         _cmd_status(args)
+    elif args.command == "install":
+        _cmd_install(args)
 
 
 def _resolve_db(args_db: str | None) -> str:
@@ -271,6 +277,12 @@ def _cmd_status(args: argparse.Namespace) -> None:
     result = get_status(conn, db_path)
     conn.close()
     print(json.dumps(result, indent=2))
+
+
+def _cmd_install(args: argparse.Namespace) -> None:
+    from cortex.install import main as install_main
+
+    install_main()
 
 
 if __name__ == "__main__":

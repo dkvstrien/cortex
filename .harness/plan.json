@@ -300,7 +300,7 @@
       "id": 20,
       "name": "Contradiction detection in extraction pipeline",
       "description": "Enhance extract.py so the extraction prompt includes the top-5 most similar existing curated memories. The LLM output gains an optional 'supersedes' field. process_extraction calls supersede() when present.",
-      "status": "in_progress",
+      "status": "done",
       "acceptance_criteria": [
         "The extraction prompt includes a section 'EXISTING RELATED MEMORIES:' listing up to 5 similar curated memories with their IDs",
         "Each existing memory is labeled '[EXISTING #<id>] <content>'",
@@ -308,13 +308,14 @@
         "When supersedes is present and non-null, process_extraction calls curated.supersede() instead of remember()",
         "A test covers the happy path: store 'Dan prefers Postgres', ingest a chunk saying 'Dan switched to SQLite exclusively', run extraction, verify the old memory is soft-deleted",
         "If no existing memories are similar (below threshold), the EXISTING section is omitted from the prompt"
-      ]
+      ],
+      "sprint_completed": 7
     },
     {
       "id": 21,
       "name": "One-command installer",
       "description": "`python -m cortex install` sets up everything for a new user: creates ~/.cortex/, initializes DB, adds Stop hook and SessionStart hook to ~/.claude/settings.json, adds Cortex MCP entry to ~/.claude/.mcp.json. Non-destructive \u2014 existing config preserved.",
-      "status": "pending",
+      "status": "in_progress",
       "acceptance_criteria": [
         "`python -m cortex install` runs to completion without errors",
         "The command creates ~/.cortex/ and initializes the SQLite DB at ~/.cortex/cortex.db",
@@ -405,6 +406,6 @@
   "phase1_done": 14,
   "phase2_total": 12,
   "phase2_done": 0,
-  "done": 19,
+  "done": 20,
   "failed": 1
 }
