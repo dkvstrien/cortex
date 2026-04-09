@@ -10,17 +10,17 @@ import pytest
 
 def test_server_imports():
     """Server module can be imported without errors."""
-    from cortex.server import mcp, remember, recall, forget, status
+    from cortex.server import mcp, remember, recall, forget, supersede, status
 
 
-def test_server_has_exactly_four_tools():
-    """Server exposes exactly 4 tools: remember, recall, forget, status."""
+def test_server_has_exactly_five_tools():
+    """Server exposes exactly 5 tools: remember, recall, forget, supersede, status."""
     from cortex.server import mcp
 
     # FastMCP stores tools internally; list them
     tools = mcp._tool_manager._tools
     tool_names = sorted(tools.keys())
-    assert tool_names == ["forget", "recall", "remember", "status"]
+    assert tool_names == ["forget", "recall", "remember", "status", "supersede"]
 
 
 def test_remember_tool_curated(tmp_path):
@@ -125,10 +125,70 @@ def test_db_path_from_env(tmp_path, monkeypatch):
 
 
 def test_create_server():
-    """create_server produces a working FastMCP instance with all tools."""
+    """create_server produces a working FastMCP instance with all 5 tools."""
     from cortex.server import create_server
 
     server = create_server(port=9999)
     tools = server._tool_manager._tools
     tool_names = sorted(tools.keys())
-    assert tool_names == ["forget", "recall", "remember", "status"]
+    assert tool_names == ["forget", "recall", "remember", "status", "supersede"]
+
+
+def test_supersede_tool_end_to_end(tmp_path):
+    """supersede tool replaces an old memory and returns old_id/new_id/status."""
+    import cortex.server as srv
+
+    db_path = str(tmp_path / "test.db")
+    srv._db_path = db_path
+
+    # Store an initial memory
+    stored = srv.remember("Dan prefers Postgres", type="preference", layer="curated")
+    old_id = stored["id"]
+
+    # Supersede it with updated content
+    result = srv.supersede(old_id, "Dan prefers SQLite over Postgres")
+    assert result["status"] == "superseded"
+    assert result["old_id"] == old_id
+    assert isinstance(result["new_id"], int)
+    assert result["new_id"] != old_id
+
+    # Old memory should no longer appear in recall
+    recall_result = srv.recall("database preference", layer="curated")
+    ids_returned = [r["id"] for r in recall_result["results"]]
+    assert old_id not in ids_returned
+
+    # New memory should appear
+    assert result["new_id"] in ids_returned
+
+
+def test_supersede_tool_nonexistent(tmp_path):
+    """supersede returns an error for a nonexistent old_id."""
+    import cortex.server as srv
+
+    db_path = str(tmp_path / "test.db")
+    srv._db_path = db_path
+
+    # Init DB
+    srv.status()
+
+    result = srv.supersede(99999, "some new content")
+    assert "error" in result
+
+
+def test_supersede_tool_type_override(tmp_path):
+    """supersede with explicit type stores the new memory with the given type."""
+    import cortex.server as srv
+
+    db_path = str(tmp_path / "test.db")
+    srv._db_path = db_path
+
+    stored = srv.remember("Dan uses Vienna timezone", type="fact", layer="curated")
+    old_id = stored["id"]
+
+    result = srv.supersede(old_id, "Dan lives in Vienna, Austria", type="preference")
+    assert result["status"] == "superseded"
+
+    # Verify new memory has correct type via recall with type filter
+    recall_result = srv.recall("Vienna Austria", type="preference", layer="curated")
+    ids_returned = [r["id"] for r in recall_result["results"]]
+    assert result["new_id"] in ids_returned

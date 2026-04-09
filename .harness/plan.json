@@ -1,5 +1,6 @@
 {
-  "goal": "Build Cortex \u2014 a two-layer personal memory system for Claude Code. Curated layer (FTS5) + Raw layer (sqlite-vec). Extraction-first. MCP server.",
+  "goal": "Complete Cortex Phase 2 \u2014 automation, intelligence, and polish that makes it work without manual tool calls, easy enough that any Claude Code user would want to install it.",
+  "phase": 2,
   "features": [
     {
       "id": 1,
@@ -215,9 +216,193 @@
         "Running python -m cortex --version prints the version"
       ],
       "sprint_completed": 14
+    },
+    {
+      "id": 15,
+      "name": "Stop hook: automatic capture to staging JSONL",
+      "description": "A shell script (~/scripts/cortex-capture.sh) reads the Claude Code Stop hook JSON payload from stdin, extracts the assistant response text, and appends a JSONL line to ~/.cortex/staging/YYYY-MM-DD.jsonl. Must be fast (<100ms) \u2014 no embedding, no network, just a file append. The Stop hook entry is added to ~/.claude/settings.json alongside existing hooks.",
+      "status": "done",
+      "acceptance_criteria": [
+        "A script exists at ~/scripts/cortex-capture.sh that reads Stop hook JSON from stdin",
+        "The script appends a JSONL line to ~/.cortex/staging/YYYY-MM-DD.jsonl (date from system clock)",
+        "Each JSONL line has exactly three fields: timestamp (ISO 8601), session_id, content",
+        "The staging directory ~/.cortex/staging/ is created automatically if it does not exist",
+        "Responses shorter than 50 characters are skipped silently (no line written)",
+        "The Stop hook entry appears in ~/.claude/settings.json under hooks.Stop without overwriting existing entries",
+        "Running the script manually with a test JSON payload completes in under 100ms"
+      ],
+      "sprint_completed": 1
+    },
+    {
+      "id": 16,
+      "name": "Staging file ingestion CLI subcommand",
+      "description": "A new `ingest-staging` subcommand for `python -m cortex`. Reads all JSONL files in a staging directory, chunks each line's content, embeds, and stores in the raw layer. Tracks completed files via the meta table so re-running is idempotent. A companion shell snippet (for the ThinkPad crontab) should rsync staging files from Mac before calling ingest-staging.",
+      "status": "done",
+      "acceptance_criteria": [
+        "`python -m cortex ingest-staging --db <path> --staging-dir <dir>` processes all .jsonl files in the directory",
+        "Each JSONL line's content field is chunked and stored in raw_chunks with source_type='session'",
+        "Completed staging files are recorded in the meta table (key='ingested_staging_file:<filename>', value='done') to prevent duplicate ingestion",
+        "Re-running on already-ingested files skips them and reports N skipped",
+        "A summary line is printed: 'N lines processed, M chunks stored, K files completed, J files skipped'",
+        "The subcommand is registered in src/cortex/__main__.py dispatch table",
+        "A test covers idempotency: ingest same staging file twice, verify chunk count unchanged"
+      ],
+      "sprint_completed": 2
+    },
+    {
+      "id": 17,
+      "name": "Session-start memory injection hook",
+      "description": "A SessionStart hook script (~/scripts/cortex-session-start.sh) that queries the Cortex MCP server's SSE HTTP endpoint, retrieves a brief summary of high-confidence recent memories, and prints it to stdout so Claude Code displays it at session start. Fails silently if the server is unreachable. Must complete within 2 seconds.\n\nFAIL FEEDBACK (sprint 3): Two bugs. (1) out=$(ssh ...) & backgrounds the subshell \u2014 out never propagates. Write SSH output to a temp file instead. (2) Script calls cortex_status.status(db_path=...) but the actual signature is status(conn: sqlite3.Connection). Fix: ssh thinkpad python3 -c \"import sqlite3,json; from cortex.status import status; conn=sqlite3.connect(\"/home/dan/.cortex/cortex.db\"); print(json.dumps(status(conn)))\" \u2014 or simpler: just use python -m cortex status --db /home/dan/.cortex/cortex.db on the ThinkPad and parse stdout.",
+      "status": "done",
+      "acceptance_criteria": [
+        "A script exists at ~/scripts/cortex-session-start.sh",
+        "The script calls the Cortex status endpoint (http://100.108.198.107:8765) with a 2-second timeout",
+        "On success, the script prints a one-line summary: 'Cortex: N memories, last updated X ago'",
+        "If the server is unreachable or the request times out, the script exits 0 with no output (fails silently)",
+        "The SessionStart hook entry appears in ~/.claude/settings.json under hooks.SessionStart without overwriting existing entries",
+        "The script completes (success or failure) in under 2 seconds"
+      ],
+      "sprint_completed": 4
+    },
+    {
+      "id": 18,
+      "name": "Supersede MCP tool and proactive CLAUDE.md instructions",
+      "description": "Expose supersede() as a 5th MCP tool in server.py. Also create a CLAUDE.md at the project root with instructions for Claude to proactively use Cortex tools.",
+      "status": "in_progress",
+      "acceptance_criteria": [
+        "server.py exposes exactly 5 tools: remember, recall, forget, supersede, status",
+        "The supersede MCP tool accepts old_id (int), new_content (str), and optional type (str)",
+        "Calling supersede soft-deletes the old memory and creates a new one with supersedes_id set",
+        "supersede returns {old_id, new_id, status: 'superseded'}",
+        "A CLAUDE.md exists at /Users/danielvanstrien/Projects/cortex/CLAUDE.md",
+        "CLAUDE.md instructs Claude to: (a) call remember for decisions/preferences/facts, (b) call recall before answering questions about user history, (c) call supersede when information changes, (d) call status periodically",
+        "A test in tests/test_server.py covers the supersede tool end-to-end"
+      ]
+    },
+    {
+      "id": 19,
+      "name": "Reflect pipeline: insight synthesis from curated memories",
+      "description": "A new `reflect` subcommand for `python -m cortex`. Groups curated memories by type/topic, generates a Haiku prompt to synthesize patterns into higher-level insight memories, and writes them back with links to source IDs.",
+      "status": "pending",
+      "acceptance_criteria": [
+        "`python -m cortex reflect --db <path>` generates a reflection prompt and prints it to stdout",
+        "The prompt groups curated memories by type and asks the LLM to identify patterns worth remembering as insights",
+        "`python -m cortex reflect --db <path> --process` reads JSON from stdin and creates curated memories with type='insight'",
+        "Each insight memory stores source_ids (the IDs of memories it was synthesized from) in its content or via the extractions table",
+        "Already-reflected memory IDs are tracked in the meta table so they are not re-included in future reflection batches",
+        "The subcommand is registered in src/cortex/__main__.py",
+        "A test verifies: store 3 related memories, run reflect prompt generation, confirm they appear in the prompt output"
+      ]
+    },
+    {
+      "id": 20,
+      "name": "Contradiction detection in extraction pipeline",
+      "description": "Enhance extract.py so the extraction prompt includes the top-5 most similar existing curated memories. The LLM output gains an optional 'supersedes' field. process_extraction calls supersede() when present.",
+      "status": "pending",
+      "acceptance_criteria": [
+        "The extraction prompt includes a section 'EXISTING RELATED MEMORIES:' listing up to 5 similar curated memories with their IDs",
+        "Each existing memory is labeled '[EXISTING #<id>] <content>'",
+        "The extraction output JSON format supports an optional supersedes field: {raw_chunk_ids, content, type, supersedes?: int}",
+        "When supersedes is present and non-null, process_extraction calls curated.supersede() instead of remember()",
+        "A test covers the happy path: store 'Dan prefers Postgres', ingest a chunk saying 'Dan switched to SQLite exclusively', run extraction, verify the old memory is soft-deleted",
+        "If no existing memories are similar (below threshold), the EXISTING section is omitted from the prompt"
+      ]
+    },
+    {
+      "id": 21,
+      "name": "One-command installer",
+      "description": "`python -m cortex install` sets up everything for a new user: creates ~/.cortex/, initializes DB, adds Stop hook and SessionStart hook to ~/.claude/settings.json, adds Cortex MCP entry to ~/.claude/.mcp.json. Non-destructive \u2014 existing config preserved.",
+      "status": "pending",
+      "acceptance_criteria": [
+        "`python -m cortex install` runs to completion without errors",
+        "The command creates ~/.cortex/ and initializes the SQLite DB at ~/.cortex/cortex.db",
+        "The Stop hook for cortex-capture.sh is added to ~/.claude/settings.json without overwriting existing hooks",
+        "The SessionStart hook for cortex-session-start.sh is added without overwriting existing hooks",
+        "The Cortex SSE MCP entry is added to ~/.claude/.mcp.json without overwriting other MCP servers",
+        "Running install a second time is idempotent \u2014 detects existing entries and skips with 'already installed' message",
+        "The installer prints a clear step-by-step log of what it did and what it skipped"
+      ]
+    },
+    {
+      "id": 22,
+      "name": "Memory CLI browser: list, search, show",
+      "description": "Three new subcommands: `list` shows recent/filtered memories as a table, `search` runs FTS5 search with scores, `show` displays a single memory with its full supersession history.",
+      "status": "pending",
+      "acceptance_criteria": [
+        "`python -m cortex list` prints the 20 most recent curated memories as a numbered table (id, type, confidence, snippet)",
+        "`python -m cortex list --type fact --limit 10` filters by type and limits output",
+        "`python -m cortex search <query>` runs recall_curated and prints ranked results with scores",
+        "`python -m cortex show <id>` prints full content, metadata, and supersession chain for the given ID",
+        "All three commands accept --db <path>",
+        "Output is human-readable plain text, no raw JSON blobs",
+        "All three subcommands are registered in src/cortex/__main__.py"
+      ]
+    },
+    {
+      "id": 23,
+      "name": "Memory export and import",
+      "description": "`python -m cortex export` dumps all non-deleted curated memories as a JSON array to stdout. `python -m cortex import` reads that JSON from stdin and inserts new memories idempotently.",
+      "status": "pending",
+      "acceptance_criteria": [
+        "`python -m cortex export --db <path>` prints a JSON array of all non-deleted curated memories to stdout",
+        "Each exported object includes: id, content, type, source, tags, confidence, created_at, supersedes_id",
+        "`python -m cortex import --db <path> < memories.json` reads the JSON array and inserts each memory",
+        "Import is idempotent: re-importing the same export produces no duplicates",
+        "Import prints a summary: N memories imported, M already present (skipped)",
+        "Both subcommands are registered in src/cortex/__main__.py",
+        "A round-trip test: export from DB A, import into DB B, verify count and content match"
+      ]
+    },
+    {
+      "id": 24,
+      "name": "Release packaging and pyproject.toml polish",
+      "description": "Make Cortex installable via `pip install git+https://...`. Pin core dependencies, add [project.scripts] entry points, ensure __version__ is set, add mcp and anthropic-sdk to deps.",
+      "status": "pending",
+      "acceptance_criteria": [
+        "pyproject.toml has [project.scripts] entry: cortex = 'cortex.__main__:main'",
+        "All direct runtime dependencies are in [project.dependencies] with minimum version pins",
+        "cortex.__version__ is set (e.g. '0.2.0') and importable",
+        "`python -m cortex --version` prints the version string",
+        "Running `pip install -e .` in a fresh venv succeeds with no missing-dependency errors",
+        "Running `python -m cortex status` after a fresh-venv install works (DB created on demand)",
+        "fastmcp or mcp is listed as a dependency with a version pin"
+      ]
+    },
+    {
+      "id": 25,
+      "name": "README and install guide",
+      "description": "README.md at the project root covering: what Cortex does, 5-minute setup guide, comparison table vs. manual memory, ASCII architecture diagram, and usage examples for each MCP tool and CLI subcommand.",
+      "status": "pending",
+      "acceptance_criteria": [
+        "README.md exists at /Users/danielvanstrien/Projects/cortex/README.md",
+        "README includes a '5-minute setup' section with numbered steps a non-programmer can follow",
+        "README includes an ASCII architecture diagram showing the full pipeline: Mac Stop hook \u2192 staging JSONL \u2192 rsync \u2192 ThinkPad \u2192 ingest-staging \u2192 raw_chunks \u2192 extract \u2192 curated_memories \u2192 MCP server \u2192 Claude Code",
+        "README includes a comparison table: 'Without Cortex' vs 'With Cortex' for at least 4 scenarios",
+        "README includes usage examples for all 5 MCP tools (remember, recall, forget, supersede, status)",
+        "README includes usage examples for key CLI subcommands: ingest, ingest-staging, extract, reflect, list, search, show, export, import, install, doctor",
+        "README is written at a level a non-programmer can understand"
+      ]
+    },
+    {
+      "id": 26,
+      "name": "cortex doctor: health checker and diagnostics",
+      "description": "`python -m cortex doctor` runs a full end-to-end diagnostics check and prints a pass/fail checklist. Checks DB, FTS5, sqlite-vec, fastembed, staging directory, and optionally the ThinkPad MCP server via SSH.",
+      "status": "pending",
+      "acceptance_criteria": [
+        "`python -m cortex doctor` prints a checklist of checks, each marked PASS, FAIL, or WARN",
+        "Checks include: DB file exists and opens, FTS5 index intact, sqlite-vec loads, fastembed available, staging directory writable",
+        "Each FAIL includes a one-line remediation hint (e.g. 'Run python -m cortex install')",
+        "The command exits with code 0 if all checks pass, code 1 if any FAIL",
+        "If --remote <ssh-host> is given, doctor also checks: MCP server running on port 8765, cron jobs exist in remote crontab",
+        "WARN (not FAIL) for optional components: sqlite-vec, fastembed, remote MCP server",
+        "The subcommand is registered in src/cortex/__main__.py"
+      ]
     }
   ],
-  "total": 14,
-  "done": 14,
-  "failed": 0
+  "total": 26,
+  "phase1_done": 14,
+  "phase2_total": 12,
+  "phase2_done": 0,
+  "done": 17,
+  "failed": 1
 }

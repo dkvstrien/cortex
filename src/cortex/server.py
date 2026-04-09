@@ -133,6 +133,38 @@ def forget(id: int) -> dict:
 
 
 @mcp.tool()
+def supersede(old_id: int, new_content: str, type: str | None = None) -> dict:
+    """Replace an existing curated memory with updated content.
+
+    Soft-deletes the old memory and creates a new one that links back to it
+    via supersedes_id. Use this instead of forget + remember to preserve
+    the change history.
+
+    Parameters:
+        old_id: The integer ID of the memory to replace.
+        new_content: The updated memory text.
+        type: Memory type override (defaults to same type as old memory).
+    """
+    try:
+        conn = _get_conn()
+    except Exception as e:
+        logger.error("Failed to connect to database: %s", e)
+        return {"error": f"Database connection failed: {e}"}
+    try:
+        from cortex.curated import supersede as curated_supersede
+
+        new_id = curated_supersede(conn, old_id, new_content, type=type)
+        return {"old_id": old_id, "new_id": new_id, "status": "superseded"}
+    except KeyError as e:
+        return {"error": str(e)}
+    except Exception as e:
+        logger.error("supersede failed: %s", e)
+        return {"error": str(e)}
+    finally:
+        conn.close()
+
+
+@mcp.tool()
 def status() -> dict:
     """Return the Cortex health dashboard.
 
@@ -166,6 +198,7 @@ def create_server(port: int = 8000, host: str = "127.0.0.1") -> FastMCP:
     server.tool()(remember)
     server.tool()(recall)
     server.tool()(forget)
+    server.tool()(supersede)
     server.tool()(status)
     return server
 
