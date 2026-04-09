@@ -82,7 +82,7 @@
       "id": 6,
       "name": "Forget and supersede operations",
       "description": "Implement forget(id) for soft-delete and supersede(old_id, new_content) which creates a new curated memory with supersedes_id pointing to old_id. Supersession chains queryable via get_history(id).",
-      "status": "in_progress",
+      "status": "done",
       "acceptance_criteria": [
         "forget(id) sets deleted_at and memory no longer appears in recall results",
         "forget does NOT physically delete the row",
@@ -90,13 +90,14 @@
         "The new memory's supersedes_id points to old_id",
         "get_history(new_id) returns the full supersession chain including the old memory",
         "Attempting to forget a non-existent ID raises a clear error"
-      ]
+      ],
+      "sprint_completed": 6
     },
     {
       "id": 7,
       "name": "Confidence decay system",
       "description": "Implement confidence decay for curated memories. Exponential decay with configurable half-life. Access reinforces confidence.",
-      "status": "pending",
+      "status": "done",
       "acceptance_criteria": [
         "New memories start with confidence=1.0",
         "Accessing a memory via recall reinforces it (confidence reset to 1.0, updated_at refreshed)",
@@ -104,13 +105,14 @@
         "A memory untouched for 90 days has confidence ~0.5 (half-life)",
         "A memory untouched for 180 days has confidence ~0.25",
         "Memories with confidence < 0.1 are flagged as stale in status output"
-      ]
+      ],
+      "sprint_completed": 7
     },
     {
       "id": 8,
       "name": "Status and health dashboard",
       "description": "Implement status() returning counts, type/source breakdowns, timestamps, db file size, stale count, integrity checks.",
-      "status": "pending",
+      "status": "in_progress",
       "acceptance_criteria": [
         "status() returns a dict with keys: curated_count, raw_count, by_type, by_source, last_memory_at, last_consolidation_at, db_size_mb, stale_count",
         "by_type maps memory types to counts",
@@ -124,7 +126,7 @@
       "id": 9,
       "name": "MCP server with 4 core tools",
       "description": "Create the MCP server using FastMCP. Expose exactly 4 tools: remember, recall, forget, status. Support stdio + SSE transport. CORTEX_DB_PATH env var.",
-      "status": "pending",
+      "status": "in_progress",
       "acceptance_criteria": [
         "Running python -m cortex.server starts an MCP server on stdio transport",
         "Running python -m cortex.server --transport sse --port 8765 starts SSE server",
@@ -140,7 +142,7 @@
       "id": 10,
       "name": "Text chunking and raw layer ingestion pipeline",
       "description": "Create ingestion module for bulk content. chunk_text splits text into overlapping chunks. ingest_file reads, chunks, embeds, and stores. CLI entry point.",
-      "status": "pending",
+      "status": "done",
       "acceptance_criteria": [
         "chunk_text splits a 1000-word text into ~3 chunks of ~300 tokens each with overlap",
         "ingest_file stores all chunks with embeddings in raw_chunks",
@@ -148,13 +150,14 @@
         "CLI accepts a file path and source_type flag",
         "Ingestion is idempotent \u2014 re-running on same file doesn't create duplicates",
         "A summary is printed: N chunks ingested, M skipped"
-      ]
+      ],
+      "sprint_completed": 10
     },
     {
       "id": 11,
       "name": "Extraction pipeline: raw to curated",
       "description": "Create extraction pipeline that promotes raw chunks to curated memories via Haiku prompts.",
-      "status": "pending",
+      "status": "in_progress",
       "acceptance_criteria": [
         "extract_prompt generates a valid prompt listing raw chunks with IDs",
         "The prompt instructs the LLM to output JSON with typed memories",
@@ -169,14 +172,15 @@
       "id": 12,
       "name": "MEMORY.md migration ingestion",
       "description": "One-time migration tool that reads existing MEMORY.md files and imports entries into curated layer.",
-      "status": "pending",
+      "status": "done",
       "acceptance_criteria": [
         "Running on Dan's actual MEMORY.md imports all entries as curated memories",
         "Project entries get type='entity', User entries get type='preference', Feedback entries get type='procedure', Reference entries get type='fact'",
         "Source is set to 'memory_md_migration' for all entries",
         "Idempotent \u2014 running twice doesn't create duplicates",
         "A summary is printed: N memories imported, M skipped (duplicates)"
-      ]
+      ],
+      "sprint_completed": 12
     },
     {
       "id": 13,
@@ -209,6 +213,6 @@
     }
   ],
   "total": 14,
-  "done": 5,
+  "done": 9,
   "failed": 0
 }
