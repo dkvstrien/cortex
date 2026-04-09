@@ -7,7 +7,7 @@ import sqlite3
 from datetime import datetime, timezone, timedelta
 from typing import Any
 
-from cortex.curated import remember
+from cortex.curated import remember, recall_curated, supersede
 
 
 VALID_TYPES = {"decision", "preference", "procedure", "entity", "fact", "idea", "insight"}
@@ -31,9 +31,24 @@ Return ONLY a JSON array (no markdown, no explanation) in this format:
 Valid types: decision, preference, procedure, entity, fact, idea.
 If no useful memories can be extracted, return an empty array: []
 
---- RAW CHUNKS ---
+{existing_section}--- RAW CHUNKS ---
 
 {chunks}
+"""
+
+EXISTING_MEMORIES_SECTION = """\
+--- EXISTING RELATED MEMORIES (for contradiction detection) ---
+
+{existing_memories}
+If any new memory you extract DIRECTLY CONTRADICTS an existing memory listed above,
+add "supersedes": <existing_id> to that item. Only use supersedes for direct
+contradictions, not minor updates.
+
+Example with supersedes:
+[
+  {{"raw_chunk_ids": [5], "content": "Dan switched to SQLite exclusively", "type": "preference", "supersedes": 12}}
+]
+
 """
 
 
@@ -78,6 +93,24 @@ def _get_unextracted_chunks(
     ]
 
 
+def _get_similar_existing_memories(
+    conn: sqlite3.Connection,
+    query: str,
+    limit: int = 5,
+) -> list[dict[str, Any]]:
+    """Return up to *limit* existing curated memories most similar to *query*.
+
+    Uses FTS5 search via recall_curated.  Returns an empty list if the query
+    produces no results or if the FTS index is empty.
+    """
+    if not query.strip():
+        return []
+    try:
+        return recall_curated(conn, query, limit=limit)
+    except Exception:
+        return []
+
+
 def extract_prompt(
     conn: sqlite3.Connection,
     scope: str = "recent",
@@ -108,7 +141,21 @@ def extract_prompt(
         )
 
     chunks_text = "\n---\n".join(chunk_lines)
-    return EXTRACTION_PROMPT_TEMPLATE.format(chunks=chunks_text)
+
+    # Gather top-5 similar existing curated memories for contradiction detection.
+    # Build a combined query from the chunk contents (up to 500 chars to avoid huge queries).
+    combined_content = " ".join(c["content"] for c in chunks)[:500]
+    existing_memories = _get_similar_existing_memories(conn, combined_content, limit=5)
+
+    if existing_memories:
+        existing_lines = "\n".join(
+            f"[EXISTING #{m['id']}] {m['content']}" for m in existing_memories
+        )
+        existing_section = EXISTING_MEMORIES_SECTION.format(existing_memories=existing_lines)
+    else:
+        existing_section = ""
+
+    return EXTRACTION_PROMPT_TEMPLATE.format(chunks=chunks_text, existing_section=existing_section)
 
 
 def process_extraction(
@@ -163,13 +210,32 @@ def process_extraction(
             if already == len(raw_chunk_ids):
                 continue
 
-        # Create curated memory
-        memory_id = remember(
-            conn,
-            content,
-            type=mem_type,
-            source="extraction",
-        )
+        # Create curated memory — either superseding an existing one or fresh.
+        supersedes_id = item.get("supersedes")
+        if supersedes_id is not None:
+            try:
+                memory_id = supersede(
+                    conn,
+                    int(supersedes_id),
+                    content,
+                    type=mem_type,
+                    source="extraction",
+                )
+            except KeyError:
+                # Old memory doesn't exist — fall back to remember()
+                memory_id = remember(
+                    conn,
+                    content,
+                    type=mem_type,
+                    source="extraction",
+                )
+        else:
+            memory_id = remember(
+                conn,
+                content,
+                type=mem_type,
+                source="extraction",
+            )
         memories_created += 1
 
         # Create extraction links

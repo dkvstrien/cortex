@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from cortex.db import init_db
+from cortex.curated import remember
 from cortex.extract import extract_prompt, process_extraction, _get_unextracted_chunks
 
 
@@ -268,6 +269,106 @@ def test_process_extraction_invalid_json_raises(conn):
     """Invalid JSON string raises ValueError."""
     with pytest.raises((json.JSONDecodeError, ValueError)):
         process_extraction(conn, "not valid json")
+
+
+def test_extract_prompt_includes_existing_memories_section(conn):
+    """extract_prompt includes EXISTING RELATED MEMORIES section when curated memories exist."""
+    # Store an existing curated memory
+    remember(conn, "Dan prefers Postgres for all databases", type="preference")
+
+    # Add a raw chunk
+    _insert_raw_chunk(conn, "Dan switched to SQLite exclusively")
+
+    prompt = extract_prompt(conn, scope="all")
+    assert prompt is not None
+    assert "EXISTING RELATED MEMORIES" in prompt
+    assert "[EXISTING #" in prompt
+    assert "Dan prefers Postgres" in prompt
+
+
+def test_extract_prompt_omits_existing_section_when_no_matches(conn):
+    """extract_prompt omits EXISTING section when no curated memories exist."""
+    _insert_raw_chunk(conn, "Some completely unrelated chunk content here")
+
+    prompt = extract_prompt(conn, scope="all")
+    assert prompt is not None
+    # No curated memories stored, so no EXISTING section
+    assert "EXISTING RELATED MEMORIES" not in prompt
+    assert "[EXISTING #" not in prompt
+
+
+def test_extract_prompt_includes_supersedes_instructions(conn):
+    """When existing memories are present, the prompt mentions the supersedes field."""
+    remember(conn, "Dan prefers Postgres for all databases", type="preference")
+    _insert_raw_chunk(conn, "Dan switched to SQLite exclusively")
+
+    prompt = extract_prompt(conn, scope="all")
+    assert "supersedes" in prompt
+
+
+def test_process_extraction_supersedes_old_memory(conn):
+    """process_extraction calls supersede() when the supersedes field is present.
+
+    Scenario: store 'Dan prefers Postgres', then process an extraction with a
+    chunk saying 'Dan switched to SQLite exclusively'. The old memory should be
+    soft-deleted and a new one created.
+    """
+    # Store existing curated memory
+    old_id = remember(conn, "Dan prefers Postgres", type="preference")
+
+    # Store a raw chunk that contradicts it
+    chunk_id = _insert_raw_chunk(conn, "Dan switched to SQLite exclusively")
+
+    # Simulate LLM extraction output with supersedes field
+    extraction = [
+        {
+            "raw_chunk_ids": [chunk_id],
+            "content": "Dan switched to SQLite exclusively",
+            "type": "preference",
+            "supersedes": old_id,
+        }
+    ]
+
+    result = process_extraction(conn, extraction)
+    assert result["memories_created"] == 1
+
+    # Old memory should be soft-deleted
+    old_row = conn.execute(
+        "SELECT deleted_at FROM curated_memories WHERE id = ?", (old_id,)
+    ).fetchone()
+    assert old_row is not None
+    assert old_row[0] is not None, "Old memory should have deleted_at set"
+
+    # New memory should exist and point back to old one
+    new_row = conn.execute(
+        "SELECT content, supersedes_id FROM curated_memories WHERE supersedes_id = ?",
+        (old_id,),
+    ).fetchone()
+    assert new_row is not None
+    assert "SQLite" in new_row[0]
+    assert new_row[1] == old_id
+
+
+def test_process_extraction_supersedes_missing_id_falls_back_to_remember(conn):
+    """If the supersedes ID doesn't exist, fall back to creating a normal memory."""
+    chunk_id = _insert_raw_chunk(conn, "Dan switched to SQLite exclusively")
+
+    extraction = [
+        {
+            "raw_chunk_ids": [chunk_id],
+            "content": "Dan uses SQLite now",
+            "type": "preference",
+            "supersedes": 99999,  # non-existent
+        }
+    ]
+
+    result = process_extraction(conn, extraction)
+    assert result["memories_created"] == 1
+
+    row = conn.execute(
+        "SELECT content FROM curated_memories WHERE content = 'Dan uses SQLite now'"
+    ).fetchone()
+    assert row is not None
 
 
 def test_full_round_trip(conn):

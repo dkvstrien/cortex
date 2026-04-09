@@ -284,7 +284,7 @@
       "id": 19,
       "name": "Reflect pipeline: insight synthesis from curated memories",
       "description": "A new `reflect` subcommand for `python -m cortex`. Groups curated memories by type/topic, generates a Haiku prompt to synthesize patterns into higher-level insight memories, and writes them back with links to source IDs.",
-      "status": "in_progress",
+      "status": "done",
       "acceptance_criteria": [
         "`python -m cortex reflect --db <path>` generates a reflection prompt and prints it to stdout",
         "The prompt groups curated memories by type and asks the LLM to identify patterns worth remembering as insights",
@@ -293,13 +293,14 @@
         "Already-reflected memory IDs are tracked in the meta table so they are not re-included in future reflection batches",
         "The subcommand is registered in src/cortex/__main__.py",
         "A test verifies: store 3 related memories, run reflect prompt generation, confirm they appear in the prompt output"
-      ]
+      ],
+      "sprint_completed": 6
     },
     {
       "id": 20,
       "name": "Contradiction detection in extraction pipeline",
       "description": "Enhance extract.py so the extraction prompt includes the top-5 most similar existing curated memories. The LLM output gains an optional 'supersedes' field. process_extraction calls supersede() when present.",
-      "status": "pending",
+      "status": "in_progress",
       "acceptance_criteria": [
         "The extraction prompt includes a section 'EXISTING RELATED MEMORIES:' listing up to 5 similar curated memories with their IDs",
         "Each existing memory is labeled '[EXISTING #<id>] <content>'",
@@ -404,6 +405,6 @@
   "phase1_done": 14,
   "phase2_total": 12,
   "phase2_done": 0,
-  "done": 18,
+  "done": 19,
   "failed": 1
 }
