@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 from typing import Any
 
-from cortex.embeddings import embed_one, serialize, serialize_vec
+from cortex.db import VEC_AVAILABLE
+from cortex.embeddings import FASTEMBED_AVAILABLE, embed_one, serialize, serialize_vec
+
+logger = logging.getLogger("cortex")
 
 
 def store_chunk(
@@ -35,6 +39,17 @@ def store_chunk(
     -------
     The integer ID of the newly created raw_chunks row.
     """
+    if not FASTEMBED_AVAILABLE:
+        raise RuntimeError(
+            "fastembed is not installed — cannot store raw chunks without embeddings. "
+            "Install it with: pip install fastembed"
+        )
+    if not VEC_AVAILABLE:
+        raise RuntimeError(
+            "sqlite-vec is not installed — cannot store raw chunks without vector index. "
+            "Install it with: pip install sqlite-vec"
+        )
+
     vector = embed_one(content)
     embedding_blob = serialize(vector)
     vec_blob = serialize_vec(vector)
@@ -83,6 +98,17 @@ def recall_raw(
     List of dicts with keys: id, content, source, source_type, metadata,
     distance, created_at. Ordered by cosine distance (closest first).
     """
+    if not FASTEMBED_AVAILABLE or not VEC_AVAILABLE:
+        missing = []
+        if not FASTEMBED_AVAILABLE:
+            missing.append("fastembed")
+        if not VEC_AVAILABLE:
+            missing.append("sqlite-vec")
+        raise RuntimeError(
+            f"Raw layer search requires {' and '.join(missing)}, which "
+            f"{'is' if len(missing) == 1 else 'are'} not installed."
+        )
+
     query_vec = serialize_vec(embed_one(query))
 
     if source_type is not None:

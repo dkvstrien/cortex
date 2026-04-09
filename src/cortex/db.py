@@ -2,10 +2,21 @@
 
 from __future__ import annotations
 
+import logging
+import os
 import sqlite3
 from pathlib import Path
 
-import sqlite_vec
+logger = logging.getLogger("cortex")
+
+# Try to import sqlite-vec; set availability flag
+try:
+    import sqlite_vec
+
+    VEC_AVAILABLE = True
+except ImportError:
+    VEC_AVAILABLE = False
+    logger.warning("sqlite-vec not available — raw layer (vector search) will be disabled")
 
 SCHEMA_SQL = """
 -- Enable WAL mode for concurrent reads
@@ -85,6 +96,8 @@ def init_db(path: str | Path) -> sqlite3.Connection:
     """Create (or open) the Cortex database at *path* and ensure the schema exists.
 
     Returns an open connection with WAL mode enabled.
+    If sqlite-vec is unavailable, the raw_chunks_vec table is not created
+    but the rest of the schema works normally.
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -92,13 +105,20 @@ def init_db(path: str | Path) -> sqlite3.Connection:
     conn = sqlite3.connect(str(path))
     conn.executescript(SCHEMA_SQL)
 
-    # Load sqlite-vec extension and create the vector index table
-    conn.enable_load_extension(True)
-    sqlite_vec.load(conn)
-    conn.enable_load_extension(False)
-    conn.execute(
-        "CREATE VIRTUAL TABLE IF NOT EXISTS raw_chunks_vec "
-        "USING vec0(embedding float[384])"
-    )
+    if VEC_AVAILABLE:
+        # Load sqlite-vec extension and create the vector index table
+        try:
+            conn.enable_load_extension(True)
+            sqlite_vec.load(conn)
+            conn.enable_load_extension(False)
+            conn.execute(
+                "CREATE VIRTUAL TABLE IF NOT EXISTS raw_chunks_vec "
+                "USING vec0(embedding float[384])"
+            )
+            logger.debug("sqlite-vec loaded successfully")
+        except Exception as e:
+            logger.warning("Failed to load sqlite-vec extension: %s", e)
+    else:
+        logger.debug("Skipping sqlite-vec setup (not installed)")
 
     return conn

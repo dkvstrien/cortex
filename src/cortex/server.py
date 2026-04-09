@@ -11,11 +11,14 @@ Defaults to ~/.cortex/cortex.db if not set.
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 
 from mcp.server.fastmcp import FastMCP
 
 from cortex.db import init_db
+
+logger = logging.getLogger("cortex")
 
 # Resolve DB path from env
 _db_path = os.environ.get("CORTEX_DB_PATH", os.path.expanduser("~/.cortex/cortex.db"))
@@ -44,7 +47,11 @@ def remember(
         tags: Optional list of tag strings.
         layer: Which layer to store in ('curated' or 'raw').
     """
-    conn = _get_conn()
+    try:
+        conn = _get_conn()
+    except Exception as e:
+        logger.error("Failed to connect to database: %s", e)
+        return {"error": f"Database connection failed: {e}"}
     try:
         if layer == "curated":
             from cortex.curated import remember as curated_remember
@@ -60,6 +67,9 @@ def remember(
             return {"id": chunk_id, "layer": "raw", "status": "stored"}
         else:
             return {"error": f"Invalid layer: {layer!r}. Must be 'curated' or 'raw'."}
+    except Exception as e:
+        logger.error("remember failed: %s", e)
+        return {"error": str(e)}
     finally:
         conn.close()
 
@@ -79,12 +89,19 @@ def recall(
         limit: Maximum number of results.
         layer: Which layer to search ('curated', 'raw', or 'both').
     """
-    conn = _get_conn()
+    try:
+        conn = _get_conn()
+    except Exception as e:
+        logger.error("Failed to connect to database: %s", e)
+        return {"error": f"Database connection failed: {e}"}
     try:
         from cortex.recall import recall as unified_recall
 
         results = unified_recall(conn, query, type=type, limit=limit, layer=layer)
         return {"results": results, "count": len(results)}
+    except Exception as e:
+        logger.error("recall failed: %s", e)
+        return {"error": str(e)}
     finally:
         conn.close()
 
@@ -96,13 +113,20 @@ def forget(id: int) -> dict:
     Parameters:
         id: The integer ID of the memory to forget.
     """
-    conn = _get_conn()
+    try:
+        conn = _get_conn()
+    except Exception as e:
+        logger.error("Failed to connect to database: %s", e)
+        return {"error": f"Database connection failed: {e}"}
     try:
         from cortex.curated import forget as curated_forget
 
         curated_forget(conn, id)
         return {"id": id, "status": "forgotten"}
     except KeyError as e:
+        return {"error": str(e)}
+    except Exception as e:
+        logger.error("forget failed: %s", e)
         return {"error": str(e)}
     finally:
         conn.close()
@@ -114,11 +138,18 @@ def status() -> dict:
 
     Shows counts, breakdowns by type/source, staleness, and integrity checks.
     """
-    conn = _get_conn()
+    try:
+        conn = _get_conn()
+    except Exception as e:
+        logger.error("Failed to connect to database: %s", e)
+        return {"error": f"Database connection failed: {e}"}
     try:
         from cortex.status import status as get_status
 
         return get_status(conn, _db_path)
+    except Exception as e:
+        logger.error("status failed: %s", e)
+        return {"error": str(e)}
     finally:
         conn.close()
 

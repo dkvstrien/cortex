@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 from typing import Any
 
 from cortex.curated import recall_curated
 from cortex.raw import recall_raw
+
+logger = logging.getLogger("cortex")
 
 
 def _normalize_bm25(rank: float) -> float:
@@ -75,7 +78,11 @@ def recall(
     if layer == "curated":
         return _search_curated(conn, query, type=type, limit=limit)
     elif layer == "raw":
-        return _search_raw(conn, query, source_type=type, limit=limit)
+        try:
+            return _search_raw(conn, query, source_type=type, limit=limit)
+        except RuntimeError as e:
+            logger.warning("Raw layer unavailable: %s", e)
+            return [{"error": str(e), "layer": "raw"}]
     elif layer == "both":
         return _search_both(conn, query, type=type, limit=limit)
     else:
@@ -128,7 +135,11 @@ def _search_both(
         return curated[:limit]
 
     # Fetch extra raw results to account for deduplication
-    raw = _search_raw(conn, query, source_type=type, limit=remaining * 2)
+    try:
+        raw = _search_raw(conn, query, source_type=type, limit=remaining * 2)
+    except RuntimeError as e:
+        logger.debug("Skipping raw layer in 'both' search: %s", e)
+        return curated
 
     # Deduplicate: skip raw results whose content closely matches a curated result
     curated_contents = [r["content"] for r in curated]
