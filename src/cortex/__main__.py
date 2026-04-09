@@ -8,6 +8,9 @@ Usage:
     python -m cortex reflect [--process] [--db <path>]
     python -m cortex migrate <path> [--db <path>]
     python -m cortex status [--db <path>]
+    python -m cortex list [--type TYPE] [--limit N] [--db <path>]
+    python -m cortex search <query> [--db <path>]
+    python -m cortex show <id> [--db <path>]
     python -m cortex install
     python -m cortex --version
 """
@@ -119,6 +122,23 @@ def main() -> None:
     sp_status = subparsers.add_parser("status", help="Show health dashboard")
     sp_status.add_argument("--db", default=None, help="Path to Cortex database")
 
+    # list
+    sp_list = subparsers.add_parser("list", help="List recent curated memories as a table")
+    sp_list.add_argument("--type", default=None, help="Filter by memory type")
+    sp_list.add_argument("--limit", type=int, default=20, help="Maximum number of results (default: 20)")
+    sp_list.add_argument("--db", default=None, help="Path to Cortex database")
+
+    # search
+    sp_search = subparsers.add_parser("search", help="FTS5 search of curated memories")
+    sp_search.add_argument("query", help="Search query")
+    sp_search.add_argument("--limit", type=int, default=20, help="Maximum number of results (default: 20)")
+    sp_search.add_argument("--db", default=None, help="Path to Cortex database")
+
+    # show
+    sp_show = subparsers.add_parser("show", help="Show full details for a single memory")
+    sp_show.add_argument("id", type=int, help="Memory ID")
+    sp_show.add_argument("--db", default=None, help="Path to Cortex database")
+
     # install
     subparsers.add_parser("install", help="Set up Cortex for a new user (idempotent)")
 
@@ -142,6 +162,12 @@ def main() -> None:
         _cmd_migrate(args)
     elif args.command == "status":
         _cmd_status(args)
+    elif args.command == "list":
+        _cmd_list(args)
+    elif args.command == "search":
+        _cmd_search(args)
+    elif args.command == "show":
+        _cmd_show(args)
     elif args.command == "install":
         _cmd_install(args)
 
@@ -277,6 +303,40 @@ def _cmd_status(args: argparse.Namespace) -> None:
     result = get_status(conn, db_path)
     conn.close()
     print(json.dumps(result, indent=2))
+
+
+def _cmd_list(args: argparse.Namespace) -> None:
+    from cortex.db import init_db
+    from cortex.browse import list_memories, print_list
+
+    db_path = _resolve_db(args.db)
+    conn = init_db(db_path)
+    memories = list_memories(conn, type=args.type, limit=args.limit)
+    conn.close()
+    print_list(memories)
+
+
+def _cmd_search(args: argparse.Namespace) -> None:
+    from cortex.db import init_db
+    from cortex.browse import search_memories, print_search
+
+    db_path = _resolve_db(args.db)
+    conn = init_db(db_path)
+    results = search_memories(conn, args.query, limit=args.limit)
+    conn.close()
+    print_search(results, args.query)
+
+
+def _cmd_show(args: argparse.Namespace) -> None:
+    from cortex.db import init_db
+    from cortex.browse import print_show
+
+    db_path = _resolve_db(args.db)
+    conn = init_db(db_path)
+    found = print_show(conn, args.id)
+    conn.close()
+    if not found:
+        sys.exit(1)
 
 
 def _cmd_install(args: argparse.Namespace) -> None:
