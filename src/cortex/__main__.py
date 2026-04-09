@@ -57,7 +57,7 @@ def main() -> None:
     # server
     sp_server = subparsers.add_parser("server", help="Start the MCP server")
     sp_server.add_argument(
-        "--transport", choices=["stdio", "sse"], default="stdio",
+        "--transport", choices=["stdio", "sse", "streamable-http"], default="stdio",
         help="Transport protocol (default: stdio)",
     )
     sp_server.add_argument(
@@ -213,9 +213,9 @@ def _cmd_server(args: argparse.Namespace) -> None:
 
     # Delegate to the existing server main which handles its own arg parsing
     # but we already parsed, so call directly
-    if args.transport == "sse":
+    if args.transport in ("sse", "streamable-http"):
         server = create_server(port=args.port, host=args.host)
-        server.run(transport="sse")
+        server.run(transport=args.transport)
     else:
         from cortex.server import mcp
 
