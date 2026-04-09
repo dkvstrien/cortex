@@ -1,6 +1,8 @@
 {
-  "goal": "Build Cortex — a two-layer personal memory system for Claude Code. Curated layer (FTS5, high-signal extracted facts) + Raw layer (sqlite-vec, full-text chunks with vectors). Python MCP server accessible cross-machine via Tailscale. Extraction-first design: the system writes memories, not the user.",
-  "created": "2026-04-07",
+  "goal": "Complete Cortex Phase 2 — automation, intelligence, and polish that makes it work without manual tool calls, easy enough that any Claude Code user would want to install it.",
+  "phase": 2,
+  "phase1_completed": "2026-04-07",
+  "phase2_created": "2026-04-09",
   "project_root": "/Users/danielvanstrien/Projects/cortex",
-  "stack": "Python 3.11+, SQLite FTS5, sqlite-vec, fastembed (bge-small-en-v1.5), mcp Python SDK (FastMCP), pytest"
+  "stack": "Python 3.11+, SQLite FTS5, sqlite-vec, fastembed (bge-small-en-v1.5), FastMCP, pytest, bash hooks"
 }

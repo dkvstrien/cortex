@@ -208,26 +208,26 @@ def main():
     parser = argparse.ArgumentParser(description="Cortex MCP Server")
     parser.add_argument(
         "--transport",
-        choices=["stdio", "sse"],
+        choices=["stdio", "sse", "streamable-http"],
         default="stdio",
         help="Transport protocol (default: stdio)",
     )
     parser.add_argument(
         "--host",
         default="127.0.0.1",
-        help="Host to bind SSE server (default: 127.0.0.1)",
+        help="Host to bind SSE/HTTP server (default: 127.0.0.1)",
     )
     parser.add_argument(
         "--port",
         type=int,
         default=8765,
-        help="Port for SSE transport (default: 8765)",
+        help="Port for SSE/HTTP transport (default: 8765)",
     )
     args = parser.parse_args()
 
-    if args.transport == "sse":
+    if args.transport in ("sse", "streamable-http"):
         server = create_server(port=args.port, host=args.host)
-        server.run(transport="sse")
+        server.run(transport=args.transport)
     else:
         mcp.run(transport="stdio")
 

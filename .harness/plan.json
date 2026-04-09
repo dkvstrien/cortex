@@ -395,7 +395,7 @@
       "id": 26,
       "name": "cortex doctor: health checker and diagnostics",
       "description": "`python -m cortex doctor` runs a full end-to-end diagnostics check and prints a pass/fail checklist. Checks DB, FTS5, sqlite-vec, fastembed, staging directory, and optionally the ThinkPad MCP server via SSH.",
-      "status": "in_progress",
+      "status": "done",
       "acceptance_criteria": [
         "`python -m cortex doctor` prints a checklist of checks, each marked PASS, FAIL, or WARN",
         "Checks include: DB file exists and opens, FTS5 index intact, sqlite-vec loads, fastembed available, staging directory writable",
@@ -404,13 +404,14 @@
         "If --remote <ssh-host> is given, doctor also checks: MCP server running on port 8765, cron jobs exist in remote crontab",
         "WARN (not FAIL) for optional components: sqlite-vec, fastembed, remote MCP server",
         "The subcommand is registered in src/cortex/__main__.py"
-      ]
+      ],
+      "sprint_completed": 13
     }
   ],
   "total": 26,
   "phase1_done": 14,
   "phase2_total": 12,
   "phase2_done": 0,
-  "done": 25,
+  "done": 26,
   "failed": 1
 }
