@@ -52,7 +52,8 @@
       "id": 4,
       "name": "Raw layer: chunk storage and vector search",
       "description": "Implement the raw chunks layer. store_chunk(content, source, source_type, metadata) embeds the content, stores in raw_chunks with embedding BLOB, and indexes in sqlite-vec virtual table. recall_raw(query, source_type, limit) embeds the query, performs cosine similarity search via sqlite-vec, and returns ranked results.",
-      "status": "in_progress",
+      "status": "done",
+      "sprint_completed": 4,
       "acceptance_criteria": [
         "store_chunk stores content with embedding and returns an ID",
         "recall_raw('database preference') finds semantically similar chunks",
@@ -66,7 +67,7 @@
       "id": 5,
       "name": "Unified recall with layer fallback",
       "description": "Implement the unified recall(query, type, limit, layer) function. layer='curated' (default) searches FTS5 only. layer='raw' searches vectors only. layer='both' searches curated first, then fills remaining limit from raw, deduplicating.",
-      "status": "pending",
+      "status": "in_progress",
       "acceptance_criteria": [
         "recall(query) defaults to curated layer search",
         "recall(query, layer='raw') searches only the raw layer",
@@ -207,6 +208,6 @@
     }
   ],
   "total": 14,
-  "done": 3,
+  "done": 4,
   "failed": 0
 }
