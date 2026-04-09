@@ -363,7 +363,7 @@
       "id": 24,
       "name": "Release packaging and pyproject.toml polish",
       "description": "Make Cortex installable via `pip install git+https://...`. Pin core dependencies, add [project.scripts] entry points, ensure __version__ is set, add mcp and anthropic-sdk to deps.",
-      "status": "in_progress",
+      "status": "done",
       "acceptance_criteria": [
         "pyproject.toml has [project.scripts] entry: cortex = 'cortex.__main__:main'",
         "All direct runtime dependencies are in [project.dependencies] with minimum version pins",
@@ -372,13 +372,14 @@
         "Running `pip install -e .` in a fresh venv succeeds with no missing-dependency errors",
         "Running `python -m cortex status` after a fresh-venv install works (DB created on demand)",
         "fastmcp or mcp is listed as a dependency with a version pin"
-      ]
+      ],
+      "sprint_completed": 11
     },
     {
       "id": 25,
       "name": "README and install guide",
       "description": "README.md at the project root covering: what Cortex does, 5-minute setup guide, comparison table vs. manual memory, ASCII architecture diagram, and usage examples for each MCP tool and CLI subcommand.",
-      "status": "pending",
+      "status": "in_progress",
       "acceptance_criteria": [
         "README.md exists at /Users/danielvanstrien/Projects/cortex/README.md",
         "README includes a '5-minute setup' section with numbered steps a non-programmer can follow",
@@ -409,6 +410,6 @@
   "phase1_done": 14,
   "phase2_total": 12,
   "phase2_done": 0,
-  "done": 23,
+  "done": 24,
   "failed": 1
 }
