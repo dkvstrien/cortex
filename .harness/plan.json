@@ -189,7 +189,7 @@
       "id": 13,
       "name": "End-to-end test suite",
       "description": "Comprehensive pytest suite covering both layers and all operations.",
-      "status": "in_progress",
+      "status": "done",
       "acceptance_criteria": [
         "pytest runs all tests with 0 failures",
         "Tests cover: remember, recall_curated, recall_raw, recall (unified), forget, supersede, get_history, decay_confidence, status",
@@ -198,13 +198,14 @@
         "Tests use temporary databases (no leftover files)",
         "Confidence decay math is tested: half-life produces expected values",
         "MCP server can be instantiated without errors in tests"
-      ]
+      ],
+      "sprint_completed": 13
     },
     {
       "id": 14,
       "name": "Graceful degradation and production hardening",
       "description": "Add graceful degradation if sqlite-vec/fastembed unavailable. Logging. CLI dispatcher. Error handling.",
-      "status": "pending",
+      "status": "done",
       "acceptance_criteria": [
         "If sqlite-vec is unavailable, curated layer still works and recall(layer='raw') returns a clear error message instead of crashing",
         "If fastembed is unavailable, recall falls back to FTS5-only search with a warning",
@@ -212,10 +213,11 @@
         "CLI python -m cortex dispatches to subcommands: server, ingest, extract, migrate, status",
         "MCP server returns structured error responses for invalid inputs (doesn't crash)",
         "Running python -m cortex --version prints the version"
-      ]
+      ],
+      "sprint_completed": 14
     }
   ],
   "total": 14,
-  "done": 12,
+  "done": 14,
   "failed": 0
 }

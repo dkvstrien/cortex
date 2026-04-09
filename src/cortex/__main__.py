@@ -51,6 +51,10 @@ def main() -> None:
         help="Transport protocol (default: stdio)",
     )
     sp_server.add_argument(
+        "--host", default="127.0.0.1",
+        help="Host to bind SSE server (default: 127.0.0.1)",
+    )
+    sp_server.add_argument(
         "--port", type=int, default=8765,
         help="Port for SSE transport (default: 8765)",
     )
@@ -119,7 +123,7 @@ def _cmd_server(args: argparse.Namespace) -> None:
     # Delegate to the existing server main which handles its own arg parsing
     # but we already parsed, so call directly
     if args.transport == "sse":
-        server = create_server(port=args.port)
+        server = create_server(port=args.port, host=args.host)
         server.run(transport="sse")
     else:
         from cortex.server import mcp

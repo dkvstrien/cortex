@@ -154,13 +154,13 @@ def status() -> dict:
         conn.close()
 
 
-def create_server(port: int = 8000) -> FastMCP:
-    """Create a new FastMCP server instance with the given port.
+def create_server(port: int = 8000, host: str = "127.0.0.1") -> FastMCP:
+    """Create a new FastMCP server instance with the given host/port.
 
     Re-registers all tools on the new instance. Useful when port
     needs to differ from the default module-level server.
     """
-    server = FastMCP("cortex", port=port)
+    server = FastMCP("cortex", host=host, port=port)
 
     # Re-register tools on the new server
     server.tool()(remember)
@@ -180,6 +180,11 @@ def main():
         help="Transport protocol (default: stdio)",
     )
     parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Host to bind SSE server (default: 127.0.0.1)",
+    )
+    parser.add_argument(
         "--port",
         type=int,
         default=8765,
@@ -188,7 +193,7 @@ def main():
     args = parser.parse_args()
 
     if args.transport == "sse":
-        server = create_server(port=args.port)
+        server = create_server(port=args.port, host=args.host)
         server.run(transport="sse")
     else:
         mcp.run(transport="stdio")
