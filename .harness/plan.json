@@ -1,12 +1,12 @@
 {
-  "project": "cortex",
-  "description": "Personal memory system with curated knowledge and raw chunk storage",
+  "goal": "Build Cortex — a two-layer personal memory system for Claude Code. Curated layer (FTS5) + Raw layer (sqlite-vec). Extraction-first. MCP server.",
   "features": [
     {
       "id": 1,
       "name": "Project scaffolding and SQLite schema",
       "description": "Set up Python project (pyproject.toml, src/cortex/, tests/). Create the full SQLite schema.",
       "status": "done",
+      "sprint_completed": 1,
       "acceptance_criteria": [
         "Running pip install -e . from project root succeeds",
         "Importing from cortex.db import init_db works and creates a .db file with all tables",
@@ -16,10 +16,196 @@
         "meta table exists with key-value structure",
         "WAL mode is enabled on the database",
         "pytest runs with 0 errors"
-      ],
-      "sprint_completed": 1
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Curated layer: remember and FTS5 search",
+      "description": "Implement the curated memory layer. remember(content, type, source, tags, confidence) inserts into curated_memories and syncs to the FTS5 index. recall_curated(query, type, limit) searches via FTS5 BM25 ranking. Results include the BM25 rank score. Soft delete and superseded memories excluded from search by default.",
+      "status": "done",
+      "sprint_completed": 2,
+      "acceptance_criteria": [
+        "remember('Dan prefers SQLite over Postgres', type='preference', source='manual') returns an integer ID",
+        "recall_curated('database preference') returns the stored memory with a rank score",
+        "recall_curated with type filter only returns memories of that type",
+        "recall_curated with limit=1 returns exactly 1 result",
+        "Soft-deleted memories (deleted_at set) do not appear in recall results",
+        "FTS5 search handles partial word matches via prefix queries",
+        "Results are returned as dicts with keys: id, content, type, source, tags, confidence, rank, created_at"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Embedding engine with fastembed",
+      "description": "Create embeddings module wrapping fastembed with bge-small-en-v1.5. Provide embed_one(text) -> list[float] and embed_batch(texts) -> list[list[float]]. Model loaded lazily on first call. Include serialize/deserialize helpers for SQLite BLOB storage. No PyTorch dependency.",
+      "status": "in_progress",
+      "acceptance_criteria": [
+        "embed_one('hello world') returns a list of 384 floats",
+        "embed_batch(['a', 'b', 'c']) returns 3 vectors, each 384 floats",
+        "Round-tripping through serialize/deserialize produces identical vectors",
+        "Model is NOT loaded until the first embed call (lazy init)",
+        "No PyTorch in dependencies — only fastembed + onnxruntime"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "Raw layer: chunk storage and vector search",
+      "description": "Implement the raw chunks layer. store_chunk(content, source, source_type, metadata) embeds the content, stores in raw_chunks with embedding BLOB, and indexes in sqlite-vec virtual table. recall_raw(query, source_type, limit) embeds the query, performs cosine similarity search via sqlite-vec, and returns ranked results.",
+      "status": "pending",
+      "acceptance_criteria": [
+        "store_chunk stores content with embedding and returns an ID",
+        "recall_raw('database preference') finds semantically similar chunks",
+        "recall_raw with source_type filter only returns matching source types",
+        "recall_raw respects the limit parameter",
+        "Semantic search works: store 'I love pizza', search 'favorite food' returns it",
+        "sqlite-vec extension loads on the current platform without errors"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "Unified recall with layer fallback",
+      "description": "Implement the unified recall(query, type, limit, layer) function. layer='curated' (default) searches FTS5 only. layer='raw' searches vectors only. layer='both' searches curated first, then fills remaining limit from raw, deduplicating.",
+      "status": "pending",
+      "acceptance_criteria": [
+        "recall(query) defaults to curated layer search",
+        "recall(query, layer='raw') searches only the raw layer",
+        "recall(query, layer='both') returns results from both layers, curated first",
+        "layer='both' deduplicates results that exist in both layers",
+        "Results from both layers have a normalized score for consistent ranking",
+        "The simple query expansion splits 'database preference' into multiple search terms"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "Forget and supersede operations",
+      "description": "Implement forget(id) for soft-delete and supersede(old_id, new_content) which creates a new curated memory with supersedes_id pointing to old_id. Supersession chains queryable via get_history(id).",
+      "status": "pending",
+      "acceptance_criteria": [
+        "forget(id) sets deleted_at and memory no longer appears in recall results",
+        "forget does NOT physically delete the row",
+        "supersede(old_id, 'new fact') creates a new memory and soft-deletes the old one",
+        "The new memory's supersedes_id points to old_id",
+        "get_history(new_id) returns the full supersession chain including the old memory",
+        "Attempting to forget a non-existent ID raises a clear error"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "Confidence decay system",
+      "description": "Implement confidence decay for curated memories. Exponential decay with configurable half-life. Access reinforces confidence.",
+      "status": "pending",
+      "acceptance_criteria": [
+        "New memories start with confidence=1.0",
+        "Accessing a memory via recall reinforces it (confidence reset to 1.0, updated_at refreshed)",
+        "decay_confidence() reduces confidence based on time since updated_at",
+        "A memory untouched for 90 days has confidence ~0.5 (half-life)",
+        "A memory untouched for 180 days has confidence ~0.25",
+        "Memories with confidence < 0.1 are flagged as stale in status output"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "Status and health dashboard",
+      "description": "Implement status() returning counts, type/source breakdowns, timestamps, db file size, stale count, integrity checks.",
+      "status": "pending",
+      "acceptance_criteria": [
+        "status() returns a dict with keys: curated_count, raw_count, by_type, by_source, last_memory_at, last_consolidation_at, db_size_mb, stale_count",
+        "by_type maps memory types to counts",
+        "by_source maps source types to counts",
+        "stale_count is the number of curated memories with confidence < 0.1",
+        "Integrity check reports if FTS5 count differs from curated_memories count",
+        "Integrity check reports if vec index count differs from raw_chunks count"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "MCP server with 4 core tools",
+      "description": "Create the MCP server using FastMCP. Expose exactly 4 tools: remember, recall, forget, status. Support stdio + SSE transport. CORTEX_DB_PATH env var.",
+      "status": "pending",
+      "acceptance_criteria": [
+        "Running python -m cortex.server starts an MCP server on stdio transport",
+        "Running python -m cortex.server --transport sse --port 8765 starts SSE server",
+        "The server exposes exactly 4 tools: remember, recall, forget, status",
+        "remember tool accepts content, type, tags, layer parameters",
+        "recall tool accepts query, type, limit, layer parameters",
+        "forget tool accepts id and returns confirmation",
+        "status tool returns the full health dashboard",
+        "CORTEX_DB_PATH environment variable controls database location"
+      ]
+    },
+    {
+      "id": 10,
+      "name": "Text chunking and raw layer ingestion pipeline",
+      "description": "Create ingestion module for bulk content. chunk_text splits text into overlapping chunks. ingest_file reads, chunks, embeds, and stores. CLI entry point.",
+      "status": "pending",
+      "acceptance_criteria": [
+        "chunk_text splits a 1000-word text into ~3 chunks of ~300 tokens each with overlap",
+        "ingest_file stores all chunks with embeddings in raw_chunks",
+        "Session log ingestion skips tool call messages and messages under 50 chars",
+        "CLI accepts a file path and source_type flag",
+        "Ingestion is idempotent — re-running on same file doesn't create duplicates",
+        "A summary is printed: N chunks ingested, M skipped"
+      ]
+    },
+    {
+      "id": 11,
+      "name": "Extraction pipeline: raw to curated",
+      "description": "Create extraction pipeline that promotes raw chunks to curated memories via Haiku prompts.",
+      "status": "pending",
+      "acceptance_criteria": [
+        "extract_prompt generates a valid prompt listing raw chunks with IDs",
+        "The prompt instructs the LLM to output JSON with typed memories",
+        "process_extraction creates curated memories and extraction links",
+        "Each extraction links a raw_chunk_id to a curated_memory_id",
+        "CLI without --process outputs prompt to stdout",
+        "CLI with --process reads JSON from stdin and creates memories",
+        "Already-extracted chunks are skipped"
+      ]
+    },
+    {
+      "id": 12,
+      "name": "MEMORY.md migration ingestion",
+      "description": "One-time migration tool that reads existing MEMORY.md files and imports entries into curated layer.",
+      "status": "pending",
+      "acceptance_criteria": [
+        "Running on Dan's actual MEMORY.md imports all entries as curated memories",
+        "Project entries get type='entity', User entries get type='preference', Feedback entries get type='procedure', Reference entries get type='fact'",
+        "Source is set to 'memory_md_migration' for all entries",
+        "Idempotent — running twice doesn't create duplicates",
+        "A summary is printed: N memories imported, M skipped (duplicates)"
+      ]
+    },
+    {
+      "id": 13,
+      "name": "End-to-end test suite",
+      "description": "Comprehensive pytest suite covering both layers and all operations.",
+      "status": "pending",
+      "acceptance_criteria": [
+        "pytest runs all tests with 0 failures",
+        "Tests cover: remember, recall_curated, recall_raw, recall (unified), forget, supersede, get_history, decay_confidence, status",
+        "At least one test verifies FTS5 search ranks relevant results above irrelevant ones (30+ memories)",
+        "At least one test verifies vector search ranks semantically similar content higher (20+ chunks)",
+        "Tests use temporary databases (no leftover files)",
+        "Confidence decay math is tested: half-life produces expected values",
+        "MCP server can be instantiated without errors in tests"
+      ]
+    },
+    {
+      "id": 14,
+      "name": "Graceful degradation and production hardening",
+      "description": "Add graceful degradation if sqlite-vec/fastembed unavailable. Logging. CLI dispatcher. Error handling.",
+      "status": "pending",
+      "acceptance_criteria": [
+        "If sqlite-vec is unavailable, curated layer still works and recall(layer='raw') returns a clear error message instead of crashing",
+        "If fastembed is unavailable, recall falls back to FTS5-only search with a warning",
+        "CORTEX_LOG_LEVEL=DEBUG enables verbose logging",
+        "CLI python -m cortex dispatches to subcommands: server, ingest, extract, migrate, status",
+        "MCP server returns structured error responses for invalid inputs (doesn't crash)",
+        "Running python -m cortex --version prints the version"
+      ]
     }
   ],
-  "done": 1,
-  "in_progress": [2]
+  "total": 14,
+  "done": 2,
+  "failed": 0
 }

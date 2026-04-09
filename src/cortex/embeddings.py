@@ -1,0 +1,57 @@
+"""Embedding engine wrapping fastembed with bge-small-en-v1.5.
+
+Provides lazy-loaded embedding functions and serialize/deserialize helpers
+for storing vectors as SQLite BLOBs.
+"""
+
+from __future__ import annotations
+
+import struct
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from fastembed import TextEmbedding
+
+MODEL_NAME = "BAAI/bge-small-en-v1.5"
+EMBEDDING_DIM = 384
+
+_model: TextEmbedding | None = None
+
+
+def _get_model() -> TextEmbedding:
+    """Return the shared TextEmbedding model, initializing on first call."""
+    global _model
+    if _model is None:
+        from fastembed import TextEmbedding
+
+        _model = TextEmbedding(model_name=MODEL_NAME)
+    return _model
+
+
+def embed_one(text: str) -> list[float]:
+    """Embed a single text string, returning a list of 384 floats."""
+    model = _get_model()
+    # fastembed returns a generator; take the first (only) result
+    embeddings = list(model.embed([text]))
+    return embeddings[0].tolist()
+
+
+def embed_batch(texts: list[str]) -> list[list[float]]:
+    """Embed multiple texts, returning a list of float vectors."""
+    model = _get_model()
+    embeddings = list(model.embed(texts))
+    return [e.tolist() for e in embeddings]
+
+
+def serialize(vector: list[float]) -> bytes:
+    """Pack a float vector into bytes for SQLite BLOB storage.
+
+    Uses little-endian float32, prefixed with dimension count.
+    """
+    return struct.pack(f"<I{len(vector)}f", len(vector), *vector)
+
+
+def deserialize(blob: bytes) -> list[float]:
+    """Unpack bytes back into a float vector."""
+    (dim,) = struct.unpack_from("<I", blob, 0)
+    return list(struct.unpack_from(f"<{dim}f", blob, 4))
