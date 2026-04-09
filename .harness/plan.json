@@ -331,7 +331,7 @@
       "id": 22,
       "name": "Memory CLI browser: list, search, show",
       "description": "Three new subcommands: `list` shows recent/filtered memories as a table, `search` runs FTS5 search with scores, `show` displays a single memory with its full supersession history.",
-      "status": "in_progress",
+      "status": "done",
       "acceptance_criteria": [
         "`python -m cortex list` prints the 20 most recent curated memories as a numbered table (id, type, confidence, snippet)",
         "`python -m cortex list --type fact --limit 10` filters by type and limits output",
@@ -340,13 +340,14 @@
         "All three commands accept --db <path>",
         "Output is human-readable plain text, no raw JSON blobs",
         "All three subcommands are registered in src/cortex/__main__.py"
-      ]
+      ],
+      "sprint_completed": 9
     },
     {
       "id": 23,
       "name": "Memory export and import",
       "description": "`python -m cortex export` dumps all non-deleted curated memories as a JSON array to stdout. `python -m cortex import` reads that JSON from stdin and inserts new memories idempotently.",
-      "status": "pending",
+      "status": "in_progress",
       "acceptance_criteria": [
         "`python -m cortex export --db <path>` prints a JSON array of all non-deleted curated memories to stdout",
         "Each exported object includes: id, content, type, source, tags, confidence, created_at, supersedes_id",
@@ -407,6 +408,6 @@
   "phase1_done": 14,
   "phase2_total": 12,
   "phase2_done": 0,
-  "done": 21,
+  "done": 22,
   "failed": 1
 }

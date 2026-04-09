@@ -11,6 +11,8 @@ Usage:
     python -m cortex list [--type TYPE] [--limit N] [--db <path>]
     python -m cortex search <query> [--db <path>]
     python -m cortex show <id> [--db <path>]
+    python -m cortex export [--db <path>]
+    python -m cortex import [--db <path>] < memories.json
     python -m cortex install
     python -m cortex --version
 """
@@ -139,6 +141,18 @@ def main() -> None:
     sp_show.add_argument("id", type=int, help="Memory ID")
     sp_show.add_argument("--db", default=None, help="Path to Cortex database")
 
+    # export
+    sp_export = subparsers.add_parser(
+        "export", help="Dump all non-deleted curated memories as JSON to stdout"
+    )
+    sp_export.add_argument("--db", default=None, help="Path to Cortex database")
+
+    # import (Python keyword — subcommand name is "import", function is _cmd_import)
+    sp_import = subparsers.add_parser(
+        "import", help="Import memories from JSON (stdin) into the curated layer"
+    )
+    sp_import.add_argument("--db", default=None, help="Path to Cortex database")
+
     # install
     subparsers.add_parser("install", help="Set up Cortex for a new user (idempotent)")
 
@@ -168,6 +182,10 @@ def main() -> None:
         _cmd_search(args)
     elif args.command == "show":
         _cmd_show(args)
+    elif args.command == "export":
+        _cmd_export(args)
+    elif args.command == "import":
+        _cmd_import(args)
     elif args.command == "install":
         _cmd_install(args)
 
@@ -337,6 +355,47 @@ def _cmd_show(args: argparse.Namespace) -> None:
     conn.close()
     if not found:
         sys.exit(1)
+
+
+def _cmd_export(args: argparse.Namespace) -> None:
+    import json
+
+    from cortex.db import init_db
+    from cortex.port import export_memories
+
+    db_path = _resolve_db(args.db)
+    conn = init_db(db_path)
+    memories = export_memories(conn)
+    conn.close()
+    print(json.dumps(memories, indent=2))
+
+
+def _cmd_import(args: argparse.Namespace) -> None:
+    import json
+
+    from cortex.db import init_db
+    from cortex.port import import_memories
+
+    db_path = _resolve_db(args.db)
+    raw = sys.stdin.read().strip()
+    if not raw:
+        print("No input received on stdin", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        memories = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        print(f"Invalid JSON: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    if not isinstance(memories, list):
+        print("Expected a JSON array", file=sys.stderr)
+        sys.exit(1)
+
+    conn = init_db(db_path)
+    result = import_memories(conn, memories)
+    conn.close()
+    print(f"{result['imported']} imported, {result['skipped']} skipped")
 
 
 def _cmd_install(args: argparse.Namespace) -> None:
