@@ -1,5 +1,5 @@
 {
-  "goal": "Build Cortex — a two-layer personal memory system for Claude Code. Curated layer (FTS5) + Raw layer (sqlite-vec). Extraction-first. MCP server.",
+  "goal": "Build Cortex \u2014 a two-layer personal memory system for Claude Code. Curated layer (FTS5) + Raw layer (sqlite-vec). Extraction-first. MCP server.",
   "features": [
     {
       "id": 1,
@@ -45,7 +45,7 @@
         "embed_batch(['a', 'b', 'c']) returns 3 vectors, each 384 floats",
         "Round-tripping through serialize/deserialize produces identical vectors",
         "Model is NOT loaded until the first embed call (lazy init)",
-        "No PyTorch in dependencies — only fastembed + onnxruntime"
+        "No PyTorch in dependencies \u2014 only fastembed + onnxruntime"
       ]
     },
     {
@@ -67,7 +67,8 @@
       "id": 5,
       "name": "Unified recall with layer fallback",
       "description": "Implement the unified recall(query, type, limit, layer) function. layer='curated' (default) searches FTS5 only. layer='raw' searches vectors only. layer='both' searches curated first, then fills remaining limit from raw, deduplicating.",
-      "status": "in_progress",
+      "status": "done",
+      "sprint_completed": 5,
       "acceptance_criteria": [
         "recall(query) defaults to curated layer search",
         "recall(query, layer='raw') searches only the raw layer",
@@ -81,7 +82,7 @@
       "id": 6,
       "name": "Forget and supersede operations",
       "description": "Implement forget(id) for soft-delete and supersede(old_id, new_content) which creates a new curated memory with supersedes_id pointing to old_id. Supersession chains queryable via get_history(id).",
-      "status": "pending",
+      "status": "in_progress",
       "acceptance_criteria": [
         "forget(id) sets deleted_at and memory no longer appears in recall results",
         "forget does NOT physically delete the row",
@@ -145,7 +146,7 @@
         "ingest_file stores all chunks with embeddings in raw_chunks",
         "Session log ingestion skips tool call messages and messages under 50 chars",
         "CLI accepts a file path and source_type flag",
-        "Ingestion is idempotent — re-running on same file doesn't create duplicates",
+        "Ingestion is idempotent \u2014 re-running on same file doesn't create duplicates",
         "A summary is printed: N chunks ingested, M skipped"
       ]
     },
@@ -173,7 +174,7 @@
         "Running on Dan's actual MEMORY.md imports all entries as curated memories",
         "Project entries get type='entity', User entries get type='preference', Feedback entries get type='procedure', Reference entries get type='fact'",
         "Source is set to 'memory_md_migration' for all entries",
-        "Idempotent — running twice doesn't create duplicates",
+        "Idempotent \u2014 running twice doesn't create duplicates",
         "A summary is printed: N memories imported, M skipped (duplicates)"
       ]
     },
@@ -208,6 +209,6 @@
     }
   ],
   "total": 14,
-  "done": 4,
+  "done": 5,
   "failed": 0
 }
