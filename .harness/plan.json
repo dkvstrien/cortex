@@ -347,7 +347,7 @@
       "id": 23,
       "name": "Memory export and import",
       "description": "`python -m cortex export` dumps all non-deleted curated memories as a JSON array to stdout. `python -m cortex import` reads that JSON from stdin and inserts new memories idempotently.",
-      "status": "in_progress",
+      "status": "done",
       "acceptance_criteria": [
         "`python -m cortex export --db <path>` prints a JSON array of all non-deleted curated memories to stdout",
         "Each exported object includes: id, content, type, source, tags, confidence, created_at, supersedes_id",
@@ -356,13 +356,14 @@
         "Import prints a summary: N memories imported, M already present (skipped)",
         "Both subcommands are registered in src/cortex/__main__.py",
         "A round-trip test: export from DB A, import into DB B, verify count and content match"
-      ]
+      ],
+      "sprint_completed": 10
     },
     {
       "id": 24,
       "name": "Release packaging and pyproject.toml polish",
       "description": "Make Cortex installable via `pip install git+https://...`. Pin core dependencies, add [project.scripts] entry points, ensure __version__ is set, add mcp and anthropic-sdk to deps.",
-      "status": "pending",
+      "status": "in_progress",
       "acceptance_criteria": [
         "pyproject.toml has [project.scripts] entry: cortex = 'cortex.__main__:main'",
         "All direct runtime dependencies are in [project.dependencies] with minimum version pins",
@@ -408,6 +409,6 @@
   "phase1_done": 14,
   "phase2_total": 12,
   "phase2_done": 0,
-  "done": 22,
+  "done": 23,
   "failed": 1
 }
