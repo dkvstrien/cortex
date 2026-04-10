@@ -10,8 +10,11 @@
 
   async function load() {
     loading = true;
-    sessions = await api.sessions.list(filter);
-    loading = false;
+    try {
+      sessions = await api.sessions.list(filter);
+    } finally {
+      loading = false;
+    }
   }
 
   onMount(load);
@@ -21,7 +24,7 @@
       ? sessions.filter(
           (s) =>
             s.title?.toLowerCase().includes(search.toLowerCase()) ||
-            s.tags.some((t) => t.includes(search.toLowerCase()))
+            (s.tags ?? []).some((t) => t.includes(search.toLowerCase()))
         )
       : sessions
   );
@@ -65,7 +68,7 @@
                 {#if session.status === 'open'}<span class="open-badge">⚠ open</span>{/if}
               </div>
               <div class="tags">
-                {#each session.tags as tag}<span class="tag">{tag}</span>{/each}
+                {#each (session.tags ?? []) as tag}<span class="tag">{tag}</span>{/each}
               </div>
             </div>
           </a>
