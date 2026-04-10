@@ -205,7 +205,7 @@ def _resolve_db(args_db: str | None) -> str:
     """Resolve the database path from CLI arg, env var, or default."""
     if args_db:
         return args_db
-    return os.environ.get("CORTEX_DB_PATH", "cortex.db")
+    return os.environ.get("CORTEX_DB_PATH", os.path.expanduser("~/.cortex/cortex.db"))
 
 
 def _cmd_server(args: argparse.Namespace) -> None:
