@@ -136,3 +136,30 @@ class TestInitDb:
         c1.close()
         c2 = init_db(db_path)
         c2.close()
+
+
+def test_sessions_table_exists(conn):
+    """sessions table is created by init_db."""
+    row = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'"
+    ).fetchone()
+    assert row is not None, "sessions table not found"
+
+
+def test_sessions_table_schema(conn):
+    """sessions table has the required columns."""
+    rows = conn.execute("PRAGMA table_info(sessions)").fetchall()
+    cols = {r[1] for r in rows}
+    assert cols == {
+        "id", "date", "title", "summary", "status",
+        "tags", "chunk_count", "first_seen_at", "classified_at"
+    }
+
+
+def test_sessions_status_constraint(conn):
+    """sessions.status only accepts open, closed, unprocessed."""
+    with pytest.raises(Exception):
+        conn.execute(
+            "INSERT INTO sessions (id, date, status) VALUES ('x', '2026-01-01', 'invalid')"
+        )
+        conn.commit()

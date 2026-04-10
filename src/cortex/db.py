@@ -89,6 +89,20 @@ CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY,
     value TEXT
 );
+
+-- Sessions: one row per conversation session, populated by ingest_sessions + classify
+CREATE TABLE IF NOT EXISTS sessions (
+    id            TEXT PRIMARY KEY,
+    date          TEXT NOT NULL,
+    title         TEXT,
+    summary       TEXT,
+    status        TEXT NOT NULL DEFAULT 'unprocessed'
+                      CHECK(status IN ('open', 'closed', 'unprocessed')),
+    tags          TEXT DEFAULT '[]',
+    chunk_count   INTEGER DEFAULT 0,
+    first_seen_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    classified_at TEXT
+);
 """
 
 
