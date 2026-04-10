@@ -1,0 +1,19 @@
+[Unit]
+Description=Cortex UI API
+After=network.target
+
+[Service]
+Type=simple
+User=dan
+WorkingDirectory=/home/dan/projects/cortex
+Environment=CORTEX_DB_PATH=/home/dan/.cortex/cortex.db
+Environment=VIKUNJA_API_URL=https://tasks.dkvs8001.org
+Environment=VIKUNJA_TOKEN_PATH=/home/dan/.secrets/vikunja-api-token
+Environment=VIKUNJA_PROJECT_ID=7
+Environment=CORTEX_UI_URL=http://cortex.dkvs8001.org
+ExecStart=/home/dan/projects/cortex/api/.venv/bin/uvicorn api.main:app --host 127.0.0.1 --port 5092
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

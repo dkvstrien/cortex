@@ -1,0 +1,16 @@
+[Unit]
+Description=Cortex UI Web
+After=network.target cortex-api.service
+
+[Service]
+Type=simple
+User=dan
+WorkingDirectory=/home/dan/projects/cortex/web
+ExecStart=/usr/bin/node build
+Environment=PORT=5093
+Environment=HOST=127.0.0.1
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
