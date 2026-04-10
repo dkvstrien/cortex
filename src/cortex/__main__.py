@@ -105,6 +105,16 @@ def main() -> None:
         help=f"Directory containing .jsonl staging files (default: {_default_staging_dir_sessions})",
     )
 
+    # classify
+    sp_classify = subparsers.add_parser(
+        "classify", help="Classify unprocessed sessions with Haiku (generate title/status/tags)"
+    )
+    sp_classify.add_argument("--db", default=None, help="Path to Cortex database")
+    sp_classify.add_argument(
+        "--process", action="store_true",
+        help="Read classification JSON from stdin and update sessions",
+    )
+
     # extract
     sp_extract = subparsers.add_parser("extract", help="Extract curated memories from raw chunks")
     sp_extract.add_argument(
@@ -190,6 +200,8 @@ def main() -> None:
         _cmd_ingest_staging(args)
     elif args.command == "ingest-sessions":
         _cmd_ingest_sessions(args)
+    elif args.command == "classify":
+        _cmd_classify(args)
     elif args.command == "extract":
         _cmd_extract(args)
     elif args.command == "reflect":
@@ -282,6 +294,30 @@ def _cmd_ingest_sessions(args: argparse.Namespace) -> None:
         f"{result['sessions_updated']} updated, "
         f"{result['files_processed']} files processed"
     )
+
+
+def _cmd_classify(args: argparse.Namespace) -> None:
+    from cortex.db import init_db
+    from cortex.classify import classify_prompt, process_classification
+
+    db_path = _resolve_db(args.db)
+    conn = init_db(db_path)
+
+    if args.process:
+        raw_input = sys.stdin.read().strip()
+        if not raw_input:
+            print("No input received on stdin", file=sys.stderr)
+            sys.exit(1)
+        result = process_classification(conn, raw_input)
+        print(f"{result['classified']} sessions classified, {result['skipped']} skipped")
+    else:
+        prompt = classify_prompt(conn)
+        if prompt is None:
+            print("No unprocessed sessions found.", file=sys.stderr)
+            sys.exit(0)
+        print(prompt)
+
+    conn.close()
 
 
 def _cmd_extract(args: argparse.Namespace) -> None:
