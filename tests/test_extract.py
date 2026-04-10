@@ -371,6 +371,29 @@ def test_process_extraction_supersedes_missing_id_falls_back_to_remember(conn):
     assert row is not None
 
 
+def test_process_extraction_uses_session_id_as_source(conn):
+    """process_extraction sets curated_memories.source to session_id, not 'extraction'."""
+    # Insert a raw chunk with a session source
+    conn.execute(
+        """INSERT INTO raw_chunks (id, content, source, source_type)
+           VALUES (999, 'Test content for memory extraction', 'staging:2026-04-09.jsonl:my-session-id', 'session')"""
+    )
+    conn.commit()
+
+    extraction_json = json.dumps([{
+        "raw_chunk_ids": [999],
+        "content": "Test memory content that is long enough",
+        "type": "fact"
+    }])
+    process_extraction(conn, extraction_json)
+
+    row = conn.execute(
+        "SELECT source FROM curated_memories WHERE content = 'Test memory content that is long enough'"
+    ).fetchone()
+    assert row is not None
+    assert row[0] == "my-session-id"
+
+
 def test_full_round_trip(conn):
     """End-to-end: insert chunks, generate prompt, process extraction, verify skipped."""
     # Insert some chunks

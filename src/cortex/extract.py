@@ -194,6 +194,19 @@ def process_extraction(
 
     for item in data:
         raw_chunk_ids = item.get("raw_chunk_ids", [])
+
+        # Derive session_id from the first referenced raw chunk's source.
+        # raw_chunks.source format: "staging:2026-04-09.jsonl:SESSION_ID"
+        session_id = "extraction"  # fallback for non-session sources
+        if raw_chunk_ids:
+            chunk_row = conn.execute(
+                "SELECT source FROM raw_chunks WHERE id = ?", (raw_chunk_ids[0],)
+            ).fetchone()
+            if chunk_row and chunk_row[0]:
+                parts = chunk_row[0].split(":")
+                if len(parts) >= 3:
+                    session_id = parts[-1]
+
         content = item.get("content", "").strip()
         mem_type = item.get("type", "fact")
 
@@ -224,7 +237,7 @@ def process_extraction(
                     int(supersedes_id),
                     content,
                     type=mem_type,
-                    source="extraction",
+                    source=session_id,
                 )
             except KeyError:
                 # Old memory doesn't exist — fall back to remember()
@@ -232,14 +245,14 @@ def process_extraction(
                     conn,
                     content,
                     type=mem_type,
-                    source="extraction",
+                    source=session_id,
                 )
         else:
             memory_id = remember(
                 conn,
                 content,
                 type=mem_type,
-                source="extraction",
+                source=session_id,
             )
         memories_created += 1
 

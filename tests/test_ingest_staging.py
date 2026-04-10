@@ -186,6 +186,16 @@ def test_ingest_staging_new_file_after_skip(conn, staging_dir):
 # --- CLI integration ---
 
 
+def test_source_uses_session_id(conn, staging_dir):
+    """raw_chunks source uses staging:file:session_id format; session_id is last segment."""
+    lines = [_make_jsonl_line("x" * 60, session_id="my-session")]
+    (staging_dir / "2026-04-09.jsonl").write_text("\n".join(lines))
+    ingest_staging(conn, staging_dir)
+    row = conn.execute("SELECT source FROM raw_chunks LIMIT 1").fetchone()
+    assert row[0].endswith(":my-session")
+    assert row[0].startswith("staging:")
+
+
 def test_cli_ingest_staging(staging_dir, tmp_path):
     """CLI subcommand ingest-staging runs and prints summary."""
     import subprocess
