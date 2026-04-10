@@ -177,7 +177,12 @@ def process_extraction(
     Dict with keys: memories_created, extractions_linked.
     """
     if isinstance(extraction_json, str):
-        data = json.loads(extraction_json)
+        # Strip markdown code fences if present (e.g. ```json ... ```)
+        text = extraction_json.strip()
+        if text.startswith("```"):
+            text = "\n".join(text.split("\n")[1:])
+            text = text.rsplit("```", 1)[0].strip()
+        data = json.loads(text)
     else:
         data = extraction_json
 
