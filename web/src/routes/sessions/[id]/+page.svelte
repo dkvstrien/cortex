@@ -5,14 +5,21 @@
   import type { Session, Chunk } from '$lib/types';
 
   let session = $state<Session | null>(null);
+  let loadError = $state(false);
   let showTranscript = $state(false);
   let transcriptChunks = $state<Chunk[]>([]);
+  let transcriptError = $state(false);
   let vikunjaStatus = $state<'idle' | 'loading' | 'done' | 'error'>('idle');
-  let copyStatus = $state<'idle' | 'copied'>('idle');
+  let copyStatus = $state<'idle' | 'copied' | 'error'>('idle');
 
   onMount(async () => {
     const id = $page.params.id;
-    if (id) session = await api.sessions.get(id);
+    if (!id) return;
+    try {
+      session = await api.sessions.get(id);
+    } catch {
+      loadError = true;
+    }
   });
 
   async function pushVikunja() {
@@ -34,16 +41,25 @@
 
   async function copyPrompt() {
     if (!session) return;
-    await navigator.clipboard.writeText(buildResumptionPrompt(session));
-    copyStatus = 'copied';
-    setTimeout(() => (copyStatus = 'idle'), 2000);
+    try {
+      await navigator.clipboard.writeText(buildResumptionPrompt(session));
+      copyStatus = 'copied';
+      setTimeout(() => (copyStatus = 'idle'), 2000);
+    } catch {
+      copyStatus = 'error';
+      setTimeout(() => (copyStatus = 'idle'), 2000);
+    }
   }
 
   async function loadTranscript() {
     if (!session) return;
-    const result = await api.sessions.transcript(session.id);
-    transcriptChunks = result.chunks;
-    showTranscript = true;
+    try {
+      const result = await api.sessions.transcript(session.id);
+      transcriptChunks = result.chunks;
+      showTranscript = true;
+    } catch {
+      transcriptError = true;
+    }
   }
 </script>
 
@@ -54,7 +70,9 @@
 <div class="shell">
   <a href="/" class="back">← Back</a>
 
-  {#if !session}
+  {#if loadError}
+    <p class="muted">Failed to load session.</p>
+  {:else if !session}
     <p class="muted">Loading…</p>
   {:else}
     <div class="header" class:open={session.status === 'open'}>
@@ -101,12 +119,14 @@
         {:else}📋 Push to Vikunja{/if}
       </button>
       <button onclick={copyPrompt}>
-        {copyStatus === 'copied' ? '✓ Copied!' : '▶ Copy resumption prompt'}
+        {copyStatus === 'copied' ? '✓ Copied!' : copyStatus === 'error' ? '⚠ Copy failed' : '▶ Copy resumption prompt'}
       </button>
       <button onclick={loadTranscript}>👁 Full transcript</button>
     </div>
 
-    {#if showTranscript}
+    {#if transcriptError}
+      <p class="muted">Failed to load transcript.</p>
+    {:else if showTranscript}
       <section>
         <h2>Full transcript</h2>
         {#each transcriptChunks as chunk}
