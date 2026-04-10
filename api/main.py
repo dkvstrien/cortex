@@ -10,6 +10,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.db import get_conn
+from api.vikunja import push_task
 
 app = FastAPI(title="Cortex UI API", version="0.1.0")
 
@@ -138,3 +139,66 @@ def get_transcript(session_id: str, conn: sqlite3.Connection = Depends(get_conn)
             for c in chunks
         ],
     }
+
+
+@app.post("/api/sessions/{session_id}/vikunja")
+def push_session_to_vikunja(
+    session_id: str, conn: sqlite3.Connection = Depends(get_conn)
+):
+    row = conn.execute(
+        "SELECT title, date FROM sessions WHERE id = ?", (session_id,)
+    ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    title = row["title"] or f"Session {session_id[:8]}"
+    base_url = os.environ.get("CORTEX_UI_URL", "http://cortex.dkvs8001.org")
+    description = f"Continue conversation from {row['date']}\n\n{base_url}/sessions/{session_id}"
+
+    try:
+        task = push_task(title=f"Continue: {title}", description=description)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Vikunja error: {exc}")
+
+    return {"task_id": task.get("id"), "task_url": "https://tasks.dkvs8001.org"}
+
+
+@app.get("/api/memories")
+def list_memories(
+    type: Optional[str] = None,
+    tag: Optional[str] = None,
+    limit: int = Query(50, ge=1, le=200),
+    conn: sqlite3.Connection = Depends(get_conn),
+):
+    conditions: list[str] = ["deleted_at IS NULL"]
+    params: list = []
+    if type:
+        conditions.append("type = ?")
+        params.append(type)
+    if tag:
+        conditions.append("tags LIKE ?")
+        params.append(f'%"{tag}"%')
+    where = "WHERE " + " AND ".join(conditions)
+    params.append(limit)
+
+    rows = conn.execute(
+        f"""
+        SELECT id, content, type, tags, source, created_at
+        FROM curated_memories
+        {where}
+        ORDER BY created_at DESC
+        LIMIT ?
+        """,
+        params,
+    ).fetchall()
+    return [
+        {
+            "id": r["id"],
+            "content": r["content"],
+            "type": r["type"],
+            "tags": json.loads(r["tags"]) if r["tags"] else [],
+            "source": r["source"],
+            "created_at": r["created_at"],
+        }
+        for r in rows
+    ]

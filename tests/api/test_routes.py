@@ -115,3 +115,21 @@ def test_get_transcript(client, test_db):
     assert resp.status_code == 200
     data = resp.json()
     assert len(data["chunks"]) == 2
+
+
+def test_list_memories(client, test_db):
+    _insert_memory(test_db, "aaa", "The farm has 42 cows", "fact")
+    _insert_memory(test_db, "bbb", "Sebastian handles robot maintenance", "entity")
+    resp = client.get("/api/memories")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 2
+
+
+def test_list_memories_filter_by_type(client, test_db):
+    _insert_memory(test_db, "aaa", "The farm has 42 cows", "fact")
+    _insert_memory(test_db, "bbb", "Prefer SQLite", "preference")
+    resp = client.get("/api/memories?type=fact")
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["type"] == "fact"
