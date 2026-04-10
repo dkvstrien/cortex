@@ -48,7 +48,7 @@
 </script>
 
 <svelte:head>
-  <title>{session?.title ?? 'Session'} — Cortex</title>
+  <title>{session ? (session.title ?? session.id) : 'Session'} — Cortex</title>
 </svelte:head>
 
 <div class="shell">
