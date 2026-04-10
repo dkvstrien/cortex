@@ -176,8 +176,9 @@ def list_memories(
         conditions.append("type = ?")
         params.append(type)
     if tag:
-        conditions.append("tags LIKE ?")
-        params.append(f'%"{tag}"%')
+        safe_tag = tag.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        conditions.append("tags LIKE ? ESCAPE '\\\\'")
+        params.append(f'%"{safe_tag}"%')
     where = "WHERE " + " AND ".join(conditions)
     params.append(limit)
 

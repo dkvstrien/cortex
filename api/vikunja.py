@@ -12,7 +12,10 @@ def _get_token() -> str:
         "VIKUNJA_TOKEN_PATH",
         str(Path.home() / ".secrets" / "vikunja-api-token"),
     )
-    return Path(token_path).read_text().strip()
+    try:
+        return Path(token_path).read_text().strip()
+    except FileNotFoundError:
+        raise RuntimeError("Vikunja token file not found")
 
 
 def _get_api_url() -> str:
