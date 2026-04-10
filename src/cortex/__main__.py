@@ -94,6 +94,17 @@ def main() -> None:
     sp_ingest_staging.add_argument("--max-tokens", type=int, default=300)
     sp_ingest_staging.add_argument("--overlap", type=int, default=50)
 
+    # ingest-sessions
+    _default_staging_dir_sessions = str(Path.home() / ".cortex" / "staging")
+    sp_ingest_sessions = subparsers.add_parser(
+        "ingest-sessions", help="Parse staging JSONL files into the sessions table"
+    )
+    sp_ingest_sessions.add_argument("--db", default=None, help="Path to Cortex database")
+    sp_ingest_sessions.add_argument(
+        "--staging-dir", default=_default_staging_dir_sessions,
+        help=f"Directory containing .jsonl staging files (default: {_default_staging_dir_sessions})",
+    )
+
     # extract
     sp_extract = subparsers.add_parser("extract", help="Extract curated memories from raw chunks")
     sp_extract.add_argument(
@@ -177,6 +188,8 @@ def main() -> None:
         _cmd_ingest(args)
     elif args.command == "ingest-staging":
         _cmd_ingest_staging(args)
+    elif args.command == "ingest-sessions":
+        _cmd_ingest_sessions(args)
     elif args.command == "extract":
         _cmd_extract(args)
     elif args.command == "reflect":
@@ -253,6 +266,21 @@ def _cmd_ingest_staging(args: argparse.Namespace) -> None:
         f"{result['chunks_stored']} chunks stored, "
         f"{result['files_completed']} files completed, "
         f"{result['files_skipped']} files skipped"
+    )
+
+
+def _cmd_ingest_sessions(args: argparse.Namespace) -> None:
+    from cortex.db import init_db
+    from cortex.sessions import ingest_sessions
+
+    db_path = _resolve_db(args.db)
+    conn = init_db(db_path)
+    result = ingest_sessions(conn, args.staging_dir)
+    conn.close()
+    print(
+        f"{result['sessions_created']} sessions created, "
+        f"{result['sessions_updated']} updated, "
+        f"{result['files_processed']} files processed"
     )
 
 
