@@ -8,3 +8,4 @@ dist/
 build/
 .harness/
 .env
+node_modules/
