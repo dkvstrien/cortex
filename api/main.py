@@ -76,11 +76,12 @@ def get_session(session_id: str, conn: sqlite3.Connection = Depends(get_conn)):
     if not row:
         raise HTTPException(status_code=404, detail="Session not found")
 
+    safe_id = session_id.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     chunks = conn.execute(
         """SELECT id, content, created_at FROM raw_chunks
-           WHERE source LIKE ? AND source_type = 'session'
+           WHERE source LIKE ? ESCAPE '\\' AND source_type = 'session'
            ORDER BY created_at DESC LIMIT 10""",
-        (f"%:{session_id}",),
+        (f"%:{safe_id}",),
     ).fetchall()
 
     memories = conn.execute(
@@ -107,7 +108,7 @@ def get_session(session_id: str, conn: sqlite3.Connection = Depends(get_conn)):
                 "id": m["id"],
                 "content": m["content"],
                 "type": m["type"],
-                "tags": json.loads(m["tags"] or "[]"),
+                "tags": json.loads(m["tags"]) if m["tags"] else [],
             }
             for m in memories
         ],
@@ -122,11 +123,12 @@ def get_transcript(session_id: str, conn: sqlite3.Connection = Depends(get_conn)
     if not exists:
         raise HTTPException(status_code=404, detail="Session not found")
 
+    safe_id = session_id.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     chunks = conn.execute(
         """SELECT id, content, created_at FROM raw_chunks
-           WHERE source LIKE ? AND source_type = 'session'
+           WHERE source LIKE ? ESCAPE '\\' AND source_type = 'session'
            ORDER BY created_at ASC""",
-        (f"%:{session_id}",),
+        (f"%:{safe_id}",),
     ).fetchall()
 
     return {
