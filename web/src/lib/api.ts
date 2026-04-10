@@ -3,7 +3,7 @@ const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:5092';
 async function get<T>(path: string): Promise<T> {
   const resp = await fetch(`${BASE}${path}`);
   if (!resp.ok) throw new Error(`${resp.status} ${path}`);
-  return resp.json();
+  return resp.json() as Promise<T>;
 }
 
 async function post<T>(path: string, body?: unknown): Promise<T> {
@@ -13,14 +13,14 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!resp.ok) throw new Error(`${resp.status} ${path}`);
-  return resp.json();
+  return resp.json() as Promise<T>;
 }
 
 export const api = {
   sessions: {
     list: (status?: string) =>
       get<import('./types').Session[]>(
-        `/api/sessions${status && status !== 'all' ? `?status=${status}` : ''}`
+        `/api/sessions${status && status !== 'all' ? `?status=${encodeURIComponent(status)}` : ''}`
       ),
     get: (id: string) => get<import('./types').Session>(`/api/sessions/${id}`),
     transcript: (id: string) =>
@@ -33,7 +33,7 @@ export const api = {
   memories: {
     list: (type?: string) =>
       get<import('./types').Memory[]>(
-        `/api/memories${type ? `?type=${type}` : ''}`
+        `/api/memories${type ? `?type=${encodeURIComponent(type)}` : ''}`
       ),
   },
 };
