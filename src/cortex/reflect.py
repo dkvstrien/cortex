@@ -169,7 +169,12 @@ def process_reflection(
     Dict with keys: insights_created, source_ids_tracked.
     """
     if isinstance(reflection_json, str):
-        data = json.loads(reflection_json)
+        # Strip markdown code fences if present (```json ... ```)
+        text = reflection_json.strip()
+        if text.startswith("```"):
+            text = "\n".join(text.split("\n")[1:])
+            text = text.rsplit("```", 1)[0].strip()
+        data = json.loads(text)
     else:
         data = reflection_json
 

@@ -396,9 +396,18 @@ def _cmd_reflect(args: argparse.Namespace) -> None:
     if args.process:
         raw_input = sys.stdin.read().strip()
         if not raw_input:
-            print("No input received on stdin", file=sys.stderr)
-            sys.exit(1)
-        result = process_reflection(conn, raw_input)
+            print("0 insights created, 0 source IDs tracked (empty input)")
+            conn.close()
+            return
+        try:
+            result = process_reflection(conn, raw_input)
+        except (json.JSONDecodeError, ValueError) as exc:
+            print(
+                f"0 insights created, 0 source IDs tracked (bad LLM output: {exc})",
+                file=sys.stderr,
+            )
+            conn.close()
+            return
         print(
             f"{result['insights_created']} insights created, "
             f"{result['source_ids_tracked']} source IDs tracked"
