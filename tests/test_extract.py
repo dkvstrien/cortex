@@ -125,6 +125,76 @@ def test_extract_prompt_skips_already_extracted(conn):
     assert "Not yet extracted content" in prompt
 
 
+def test_extract_prompt_limit_caps_batch_size(conn):
+    """limit caps the number of chunks included in one prompt."""
+    for i in range(5):
+        _insert_raw_chunk(conn, f"Chunk number {i}")
+
+    prompt = extract_prompt(conn, scope="all", limit=2)
+    assert prompt is not None
+    assert "Chunk number 0" in prompt
+    assert "Chunk number 1" in prompt
+    # Later chunks should not appear — limit capped at 2
+    assert "Chunk number 2" not in prompt
+    assert "Chunk number 3" not in prompt
+
+
+def test_mark_tried_prevents_chunk_recycling(conn):
+    """A chunk that was offered once with mark_tried is not offered again.
+
+    This is the regression test for the backfill infinite-loop bug: a batch
+    that produces no memories must not be re-picked on the next iteration.
+    """
+    for i in range(3):
+        _insert_raw_chunk(conn, f"Chunk number {i}")
+
+    # First call: get chunks 1-2, mark them tried
+    prompt1 = extract_prompt(conn, scope="all", limit=2, mark_tried=True)
+    assert prompt1 is not None
+    assert "Chunk number 0" in prompt1
+    assert "Chunk number 1" in prompt1
+
+    # Verify tried_at was set for the returned chunks
+    tried_count = conn.execute(
+        "SELECT COUNT(*) FROM raw_chunks WHERE tried_at IS NOT NULL"
+    ).fetchone()[0]
+    assert tried_count == 2
+
+    # Simulate: Haiku returned [] so no extractions were linked.
+    # Second call should move on to chunk 3, not recycle chunks 1-2.
+    prompt2 = extract_prompt(conn, scope="all", limit=2, mark_tried=True)
+    assert prompt2 is not None
+    assert "Chunk number 2" in prompt2
+    assert "Chunk number 0" not in prompt2
+    assert "Chunk number 1" not in prompt2
+
+    # Third call: no chunks left
+    prompt3 = extract_prompt(conn, scope="all", limit=2, mark_tried=True)
+    assert prompt3 is None
+
+
+def test_mark_tried_does_not_affect_default_behavior(conn):
+    """Without mark_tried, prior tried_at marks are ignored (backward compat)."""
+    _insert_raw_chunk(conn, "Chunk A")
+    _insert_raw_chunk(conn, "Chunk B")
+
+    # Mark chunk A as tried out-of-band
+    conn.execute("UPDATE raw_chunks SET tried_at = '2026-01-01T00:00:00Z' WHERE id = 1")
+    conn.commit()
+
+    # Default call (without mark_tried) still sees chunk A
+    prompt = extract_prompt(conn, scope="all")
+    assert prompt is not None
+    assert "Chunk A" in prompt
+    assert "Chunk B" in prompt
+
+    # With mark_tried, chunk A is skipped
+    prompt_filtered = extract_prompt(conn, scope="all", mark_tried=True)
+    assert prompt_filtered is not None
+    assert "Chunk A" not in prompt_filtered
+    assert "Chunk B" in prompt_filtered
+
+
 # --- process_extraction tests ---
 
 

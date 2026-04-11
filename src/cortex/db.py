@@ -71,7 +71,8 @@ CREATE TABLE IF NOT EXISTS raw_chunks (
     source TEXT,
     source_type TEXT NOT NULL CHECK(source_type IN ('book', 'podcast', 'session', 'article')),
     metadata TEXT DEFAULT '{}',  -- JSON object
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    tried_at TEXT  -- set when a chunk has been offered to the extractor, even if no memory was produced
 );
 
 -- NOTE: raw_chunks_vec virtual table is created separately after sqlite-vec is loaded.
@@ -118,6 +119,13 @@ def init_db(path: str | Path) -> sqlite3.Connection:
 
     conn = sqlite3.connect(str(path))
     conn.executescript(SCHEMA_SQL)
+
+    # Idempotent migration: add raw_chunks.tried_at on databases created
+    # before the column was introduced.
+    try:
+        conn.execute("ALTER TABLE raw_chunks ADD COLUMN tried_at TEXT")
+    except sqlite3.OperationalError:
+        pass  # column already exists
 
     if VEC_AVAILABLE:
         # Load sqlite-vec extension and create the vector index table

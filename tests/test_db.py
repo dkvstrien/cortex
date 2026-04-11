@@ -103,7 +103,10 @@ class TestInitDb:
     def test_raw_chunks_table(self, conn: sqlite3.Connection):
         assert "raw_chunks" in _table_names(conn)
         cols = _column_names(conn, "raw_chunks")
-        expected = ["id", "content", "embedding", "source", "source_type", "metadata", "created_at"]
+        expected = [
+            "id", "content", "embedding", "source", "source_type",
+            "metadata", "created_at", "tried_at",
+        ]
         assert cols == expected
 
     def test_raw_chunks_source_type_check(self, conn: sqlite3.Connection):

@@ -56,6 +56,7 @@ def _get_unextracted_chunks(
     conn: sqlite3.Connection,
     scope: str = "recent",
     limit: int | None = None,
+    skip_tried: bool = False,
 ) -> list[dict[str, Any]]:
     """Return raw chunks that have no entry in the extractions table.
 
@@ -66,6 +67,10 @@ def _get_unextracted_chunks(
         'all' — all unextracted chunks.
     limit:
         Maximum number of chunks to return. None = no limit.
+    skip_tried:
+        If True, also exclude chunks that have already been offered to the
+        extractor (tried_at IS NOT NULL). Prevents the backfill loop from
+        re-picking the same chunks when a batch produces no memories.
     """
     base_query = """
         SELECT rc.id, rc.content, rc.source, rc.source_type, rc.created_at
@@ -73,6 +78,9 @@ def _get_unextracted_chunks(
         WHERE rc.id NOT IN (SELECT DISTINCT raw_chunk_id FROM extractions)
     """
     params: list[Any] = []
+
+    if skip_tried:
+        base_query += " AND rc.tried_at IS NULL"
 
     if scope == "recent":
         cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime(
@@ -122,6 +130,7 @@ def extract_prompt(
     conn: sqlite3.Connection,
     scope: str = "recent",
     limit: int | None = None,
+    mark_tried: bool = False,
 ) -> str | None:
     """Generate a prompt listing unextracted raw chunks for an LLM.
 
@@ -134,14 +143,31 @@ def extract_prompt(
         'all' — all unextracted chunks.
     limit:
         Maximum number of chunks to include in the prompt. None = all.
+    mark_tried:
+        If True, exclude chunks that have already been tried, and mark the
+        returned chunks with tried_at=now before returning the prompt. Use
+        this in batched backfill loops so a batch that yields no memories
+        does not get re-selected on the next iteration.
 
     Returns
     -------
     The prompt string, or None if there are no unextracted chunks.
     """
-    chunks = _get_unextracted_chunks(conn, scope=scope, limit=limit)
+    chunks = _get_unextracted_chunks(
+        conn, scope=scope, limit=limit, skip_tried=mark_tried
+    )
     if not chunks:
         return None
+
+    if mark_tried:
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        chunk_ids = [c["id"] for c in chunks]
+        placeholders = ",".join("?" for _ in chunk_ids)
+        conn.execute(
+            f"UPDATE raw_chunks SET tried_at = ? WHERE id IN ({placeholders})",
+            [now, *chunk_ids],
+        )
+        conn.commit()
 
     chunk_lines = []
     for chunk in chunks:
@@ -319,6 +345,11 @@ def main() -> None:
         default=None,
         help="Max number of chunks to include in one extraction batch",
     )
+    parser.add_argument(
+        "--mark-tried",
+        action="store_true",
+        help="Mark selected chunks as tried so empty batches don't recycle",
+    )
     args = parser.parse_args()
 
     conn = init_db(args.db)
@@ -336,7 +367,12 @@ def main() -> None:
         )
     else:
         # Generate prompt and output to stdout
-        prompt = extract_prompt(conn, scope=args.scope, limit=args.limit)
+        prompt = extract_prompt(
+            conn,
+            scope=args.scope,
+            limit=args.limit,
+            mark_tried=args.mark_tried,
+        )
         if prompt is None:
             print("No unextracted chunks found.", file=sys.stderr)
             sys.exit(0)

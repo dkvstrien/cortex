@@ -130,6 +130,10 @@ def main() -> None:
         "--limit", type=int, default=None,
         help="Max number of chunks to include in one extraction batch",
     )
+    sp_extract.add_argument(
+        "--mark-tried", action="store_true",
+        help="Mark selected chunks as tried so empty batches don't recycle",
+    )
     sp_extract.add_argument("--db", default=None, help="Path to Cortex database")
 
     # reflect
@@ -355,7 +359,12 @@ def _cmd_extract(args: argparse.Namespace) -> None:
             f"{result['extractions_linked']} extractions linked"
         )
     else:
-        prompt = extract_prompt(conn, scope=args.scope, limit=args.limit)
+        prompt = extract_prompt(
+            conn,
+            scope=args.scope,
+            limit=args.limit,
+            mark_tried=args.mark_tried,
+        )
         if prompt is None:
             print("No unextracted chunks found.", file=sys.stderr)
             sys.exit(0)

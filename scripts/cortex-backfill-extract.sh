@@ -15,7 +15,7 @@ cd "$CORTEX_DIR"
 round=0
 while : ; do
     round=$((round + 1))
-    prompt=$(.venv/bin/python -m cortex extract --db "$DB" --scope all --limit "$BATCH" 2>/dev/null || true)
+    prompt=$(.venv/bin/python -m cortex extract --db "$DB" --scope all --limit "$BATCH" --mark-tried 2>/dev/null || true)
     if [ -z "$prompt" ]; then
         echo "backfill complete after $((round - 1)) rounds"
         break
