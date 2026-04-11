@@ -6,6 +6,7 @@ Usage:
     python -m cortex ingest-staging [--db <path>] [--staging-dir <dir>]
     python -m cortex extract [--scope recent|all] [--process] [--db <path>]
     python -m cortex reflect [--process] [--db <path>]
+    python -m cortex decay [--half-life DAYS] [--db <path>]
     python -m cortex migrate <path> [--db <path>]
     python -m cortex status [--db <path>]
     python -m cortex list [--type TYPE] [--limit N] [--db <path>]
@@ -137,6 +138,16 @@ def main() -> None:
     )
     sp_reflect.add_argument("--db", default=None, help="Path to Cortex database")
 
+    # decay
+    sp_decay = subparsers.add_parser(
+        "decay", help="Apply confidence decay to all curated memories"
+    )
+    sp_decay.add_argument(
+        "--half-life", type=float, default=90.0,
+        help="Half-life in days for exponential decay (default: 90)",
+    )
+    sp_decay.add_argument("--db", default=None, help="Path to Cortex database")
+
     # migrate
     sp_migrate = subparsers.add_parser("migrate", help="Import MEMORY.md into curated layer")
     sp_migrate.add_argument("path", help="Path to MEMORY.md file")
@@ -206,6 +217,8 @@ def main() -> None:
         _cmd_extract(args)
     elif args.command == "reflect":
         _cmd_reflect(args)
+    elif args.command == "decay":
+        _cmd_decay(args)
     elif args.command == "migrate":
         _cmd_migrate(args)
     elif args.command == "status":
@@ -372,6 +385,17 @@ def _cmd_reflect(args: argparse.Namespace) -> None:
         print(prompt)
 
     conn.close()
+
+
+def _cmd_decay(args: argparse.Namespace) -> None:
+    from cortex.db import init_db
+    from cortex.decay import decay_confidence
+
+    db_path = _resolve_db(args.db)
+    conn = init_db(db_path)
+    updated = decay_confidence(conn, half_life_days=args.half_life)
+    conn.close()
+    print(f"{updated} memories updated")
 
 
 def _cmd_migrate(args: argparse.Namespace) -> None:
