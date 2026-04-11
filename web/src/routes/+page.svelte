@@ -39,6 +39,7 @@
 <div class="shell">
   <nav>
     <span class="logo">🧠 Cortex</span>
+    <a href="/memories" class="nav-link">Memories</a>
     <div class="filters">
       <button class:active={filter === 'all'} onclick={() => { filter = 'all'; load(); }}>All</button>
       <button class:active={filter === 'open'} onclick={() => { filter = 'open'; load(); }}>
@@ -81,7 +82,9 @@
 <style>
   .shell { max-width: 700px; margin: 0 auto; padding: 16px; font-family: system-ui, sans-serif; }
   nav { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
-  .logo { font-size: 18px; font-weight: 700; margin-right: auto; }
+  .logo { font-size: 18px; font-weight: 700; }
+  .nav-link { color: #6b7280; font-size: 13px; text-decoration: none; margin-right: auto; }
+  .nav-link:hover { color: #9ca3af; }
   .filters { display: flex; gap: 4px; }
   button { background: #1f2937; border: 1px solid #374151; border-radius: 4px;
            padding: 4px 10px; color: #9ca3af; cursor: pointer; font-size: 12px; }
