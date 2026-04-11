@@ -22,6 +22,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 import sys
@@ -351,9 +352,21 @@ def _cmd_extract(args: argparse.Namespace) -> None:
     if args.process:
         raw_input = sys.stdin.read().strip()
         if not raw_input:
-            print("No input received on stdin", file=sys.stderr)
-            sys.exit(1)
-        result = process_extraction(conn, raw_input)
+            # Empty LLM response — treat as "no memories" so the backfill
+            # loop can continue. Chunks were already marked tried upstream
+            # if --mark-tried was used, so they won't recycle.
+            print("0 memories created, 0 extractions linked (empty input)")
+            conn.close()
+            return
+        try:
+            result = process_extraction(conn, raw_input)
+        except (json.JSONDecodeError, ValueError) as exc:
+            print(
+                f"0 memories created, 0 extractions linked (bad LLM output: {exc})",
+                file=sys.stderr,
+            )
+            conn.close()
+            return
         print(
             f"{result['memories_created']} memories created, "
             f"{result['extractions_linked']} extractions linked"
