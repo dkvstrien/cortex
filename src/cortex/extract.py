@@ -58,6 +58,30 @@ faceted retrieval. Examples: ["cortex", "extraction", "haiku"],
 ["russian", "lute", "tts"], ["farm", "sebastian", "tractor"],
 ["leseraum", "api", "deployment"]. Use domain names Dan uses in conversation.
 
+### The "env" tag — important
+
+If a memory describes the state of Dan's environment — what tools, software,
+libraries, services, or file paths exist on his machines — add the tag "env"
+in addition to the normal domain tags. These are things a future Claude would
+verify with `which`, `ls`, or `ps`, not things Dan chose as a preference.
+
+Examples that SHOULD get "env":
+- "Whisper is installed in ~/Projects/leseraum/api_v2/.venv"
+- "ffmpeg lives at /opt/homebrew/bin/ffmpeg on the Mac"
+- "XTTS-v2 is running on port 8880 on ThinkPad"
+- "Daimon is a bare systemd process on ThinkPad, not a Docker container"
+- "Cortex DB lives at ~/.cortex/cortex.db on ThinkPad"
+
+Examples that should NOT get "env":
+- "Dan prefers uv over pip" (preference, not environment state)
+- "ThinkPad has more RAM than Mac" (comparison, not a specific tool fact)
+- "Leseraum was deployed in March" (event, not current state)
+
+The "env" tag is how these facts get promoted to reference docs later. Err
+toward tagging — better to over-tag than miss. Durable environment facts are
+the highest-value memories for reducing "I forgot Whisper is already installed"
+friction.
+
 ## Output format
 
 Return ONLY a JSON array (no markdown fences, no prose, no explanation):
@@ -72,7 +96,13 @@ Return ONLY a JSON array (no markdown fences, no prose, no explanation):
     "raw_chunk_ids": [2],
     "content": "Daimon is the Telegram bot running as a bare process on ThinkPad (not the Docker telegram-bot container)",
     "type": "entity",
-    "tags": ["daimon", "telegram", "thinkpad"]
+    "tags": ["daimon", "telegram", "thinkpad", "env"]
+  }},
+  {{
+    "raw_chunk_ids": [5],
+    "content": "Whisper is installed at ~/Projects/leseraum/api_v2/.venv on the Mac",
+    "type": "fact",
+    "tags": ["whisper", "mac", "venv", "env"]
   }}
 ]
 

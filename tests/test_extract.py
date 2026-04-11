@@ -276,6 +276,33 @@ def test_extract_prompt_asks_for_tags(conn):
     assert "tags" in prompt.lower()
 
 
+def test_extract_prompt_teaches_env_tag(conn):
+    """The prompt describes when to apply the 'env' tag for environment facts."""
+    _insert_raw_chunk(conn, "some content")
+    prompt = extract_prompt(conn, scope="all")
+    assert prompt is not None
+    # The prompt should explicitly explain the env tag and what it's for
+    assert '"env"' in prompt or "'env'" in prompt
+    assert "Whisper" in prompt  # a concrete example is essential for LLM compliance
+
+
+def test_process_extraction_preserves_env_tag(conn):
+    """An env-tagged memory survives the pipeline unchanged."""
+    chunk_id = _insert_raw_chunk(conn, "Whisper lives in leseraum venv")
+    process_extraction(conn, [{
+        "raw_chunk_ids": [chunk_id],
+        "content": "Whisper is installed at ~/Projects/leseraum/api_v2/.venv on the Mac",
+        "type": "fact",
+        "tags": ["whisper", "mac", "venv", "env"],
+    }])
+    row = conn.execute(
+        "SELECT tags FROM curated_memories ORDER BY id DESC LIMIT 1"
+    ).fetchone()
+    stored_tags = json.loads(row[0])
+    assert "env" in stored_tags
+    assert "whisper" in stored_tags
+
+
 def test_process_extraction_creates_links(conn):
     """Each extraction links a raw_chunk_id to a curated_memory_id."""
     c1 = _insert_raw_chunk(conn, "Chunk one")
