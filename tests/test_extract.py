@@ -224,6 +224,58 @@ def test_process_extraction_creates_memories(conn):
     assert row[2] == "extraction"
 
 
+def test_process_extraction_persists_tags(conn):
+    """Tags from the extraction JSON are stored on the curated memory."""
+    chunk_id = _insert_raw_chunk(conn, "Dan uses uv for Python on Mac")
+
+    extraction = [
+        {
+            "raw_chunk_ids": [chunk_id],
+            "content": "Dan uses uv for all Python environments on Mac",
+            "type": "preference",
+            "tags": ["python", "uv", "mac"],
+        }
+    ]
+
+    process_extraction(conn, extraction)
+    row = conn.execute("SELECT tags FROM curated_memories ORDER BY id DESC LIMIT 1").fetchone()
+    assert row is not None
+    assert json.loads(row[0]) == ["python", "uv", "mac"]
+
+
+def test_process_extraction_handles_missing_tags(conn):
+    """Memories without a tags field still store successfully with []."""
+    chunk_id = _insert_raw_chunk(conn, "something")
+    process_extraction(conn, [{
+        "raw_chunk_ids": [chunk_id],
+        "content": "Tagless memory",
+        "type": "fact",
+    }])
+    row = conn.execute("SELECT tags FROM curated_memories ORDER BY id DESC LIMIT 1").fetchone()
+    assert json.loads(row[0]) == []
+
+
+def test_process_extraction_normalizes_tags(conn):
+    """Tags are lowercased and stripped; malformed ones dropped."""
+    chunk_id = _insert_raw_chunk(conn, "x")
+    process_extraction(conn, [{
+        "raw_chunk_ids": [chunk_id],
+        "content": "Normalized tags memory",
+        "type": "fact",
+        "tags": [" Python ", "UV", "", 42, None, "mac"],  # noqa
+    }])
+    row = conn.execute("SELECT tags FROM curated_memories ORDER BY id DESC LIMIT 1").fetchone()
+    assert json.loads(row[0]) == ["python", "uv", "mac"]
+
+
+def test_extract_prompt_asks_for_tags(conn):
+    """The prompt instructs the LLM to include tags on every memory."""
+    _insert_raw_chunk(conn, "some content")
+    prompt = extract_prompt(conn, scope="all")
+    assert prompt is not None
+    assert "tags" in prompt.lower()
+
+
 def test_process_extraction_creates_links(conn):
     """Each extraction links a raw_chunk_id to a curated_memory_id."""
     c1 = _insert_raw_chunk(conn, "Chunk one")

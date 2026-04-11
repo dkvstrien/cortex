@@ -13,23 +13,71 @@ from cortex.curated import remember, recall_curated, supersede
 VALID_TYPES = {"decision", "preference", "procedure", "entity", "fact", "idea", "insight"}
 
 EXTRACTION_PROMPT_TEMPLATE = """\
-You are a memory extraction agent. Below are raw text chunks from various sources.
-Your job is to extract distinct, reusable memories from them.
+You are a memory extraction agent for Dan's long-term memory. The raw text
+chunks below are from past Claude Code sessions. Your job is to extract
+DURABLE, REUSABLE memories a future Claude would actually want to retrieve.
 
-Each memory should be a concise, standalone statement of knowledge — something
-worth remembering long-term. Categorize each as one of: decision, preference,
-procedure, entity, fact, idea.
+## What makes a good memory
 
-Link each memory back to the raw chunk IDs it was derived from.
+Extract things that will still be true and useful weeks or months from now:
+- Decisions Dan made (with the reason, not just the outcome)
+- Preferences Dan stated or that correction patterns implied
+- Procedures/how-tos for recurring tasks (specific enough to follow)
+- Entities: named projects, people, tools, services, with a one-line purpose
+- Durable facts: API endpoints, file paths, credentials locations, hard numbers
+- Ideas Dan is actively considering (captured in his own framing when possible)
 
-Return ONLY a JSON array (no markdown, no explanation) in this format:
+Each memory MUST be:
+- Self-contained — readable without the original context
+- Specific — names the thing, the path, the number, the "why"
+- Non-obvious — worth the retrieval cost (skip platitudes)
+
+## Hard rules (do not violate)
+
+1. NEVER invent numbers, thresholds, quantities, dates, or names that are
+   not explicitly stated in the chunks. If Dan didn't say "50+", don't say
+   "50+". Prefer omitting a number to guessing one.
+2. DO NOT extract ephemeral state: "X has 44 memories", "widget shows 52%",
+   "currently 3 pending jobs", "process is running". These change hourly
+   and poison retrieval. Extract the durable fact BEHIND the snapshot
+   ("Cortex tracks memory count via status endpoint") not the snapshot itself.
+3. DO NOT extract universal platitudes: "Dan prefers simpler solutions",
+   "Dan values reliability". True of everyone; adds no signal.
+4. DO NOT conflate concurrent topics. If Dan mentions a tutor bot AND Cortex
+   in the same session, do not say "Cortex includes a tutor bot" unless the
+   chunks explicitly make that link.
+5. DO NOT extract the same memory twice with different wording. If chunks 2
+   and 7 both describe the same idea, emit ONE memory linking both chunk IDs.
+6. If Dan corrects Claude ("no, use trash not rm"), that correction IS the
+   memory — extract it as a preference, in Dan's own framing.
+
+## Tags
+
+Every memory MUST include 2–4 lowercase tags in a "tags" array. Tags enable
+faceted retrieval. Examples: ["cortex", "extraction", "haiku"],
+["russian", "lute", "tts"], ["farm", "sebastian", "tractor"],
+["leseraum", "api", "deployment"]. Use domain names Dan uses in conversation.
+
+## Output format
+
+Return ONLY a JSON array (no markdown fences, no prose, no explanation):
 [
-  {{"raw_chunk_ids": [1, 3], "content": "Dan prefers SQLite over PostgreSQL", "type": "preference"}},
-  {{"raw_chunk_ids": [2], "content": "Daimon is the Telegram bot", "type": "entity"}}
+  {{
+    "raw_chunk_ids": [1, 3],
+    "content": "Dan uses uv to manage Python environments for Mac projects; never pip install globally",
+    "type": "preference",
+    "tags": ["python", "uv", "mac"]
+  }},
+  {{
+    "raw_chunk_ids": [2],
+    "content": "Daimon is the Telegram bot running as a bare process on ThinkPad (not the Docker telegram-bot container)",
+    "type": "entity",
+    "tags": ["daimon", "telegram", "thinkpad"]
+  }}
 ]
 
 Valid types: decision, preference, procedure, entity, fact, idea.
-If no useful memories can be extracted, return an empty array: []
+If no useful memories can be extracted from these chunks, return: []
 
 {existing_section}--- RAW CHUNKS ---
 
@@ -253,6 +301,15 @@ def process_extraction(
         if mem_type not in VALID_TYPES:
             mem_type = "fact"
 
+        # Validate tags — must be a list of non-empty strings. Silently
+        # drop malformed tags rather than failing the whole batch.
+        raw_tags = item.get("tags", [])
+        tags = [
+            t.strip().lower()
+            for t in raw_tags
+            if isinstance(t, str) and t.strip()
+        ] if isinstance(raw_tags, list) else []
+
         # Skip if all referenced chunks are already extracted
         if raw_chunk_ids:
             placeholders = ",".join("?" for _ in raw_chunk_ids)
@@ -274,6 +331,7 @@ def process_extraction(
                     content,
                     type=mem_type,
                     source=session_id,
+                    tags=tags,
                 )
             except KeyError:
                 # Old memory doesn't exist — fall back to remember()
@@ -282,6 +340,7 @@ def process_extraction(
                     content,
                     type=mem_type,
                     source=session_id,
+                    tags=tags,
                 )
         else:
             memory_id = remember(
@@ -289,6 +348,7 @@ def process_extraction(
                 content,
                 type=mem_type,
                 source=session_id,
+                tags=tags,
             )
         memories_created += 1
 
