@@ -127,6 +127,25 @@ def init_db(path: str | Path) -> sqlite3.Connection:
     except sqlite3.OperationalError:
         pass  # column already exists
 
+    # Idempotent migration: databases created before 'insight' was added to
+    # the curated_memories.type CHECK constraint need it patched in so the
+    # reflect pipeline can store insight rows. SQLite cannot ALTER a CHECK
+    # constraint, so we rewrite sqlite_master directly.
+    current_sql = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='curated_memories'"
+    ).fetchone()
+    if current_sql and "'insight'" not in current_sql[0]:
+        conn.execute("PRAGMA writable_schema = 1")
+        conn.execute(
+            "UPDATE sqlite_master "
+            "SET sql = replace(sql, "
+            "\"'fact', 'idea')\", "
+            "\"'fact', 'idea', 'insight')\") "
+            "WHERE type='table' AND name='curated_memories'"
+        )
+        conn.execute("PRAGMA writable_schema = 0")
+        conn.commit()
+
     if VEC_AVAILABLE:
         # Load sqlite-vec extension and create the vector index table
         try:
