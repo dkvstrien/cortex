@@ -126,6 +126,10 @@ def main() -> None:
         "--process", action="store_true",
         help="Read extraction JSON from stdin and process it",
     )
+    sp_extract.add_argument(
+        "--limit", type=int, default=None,
+        help="Max number of chunks to include in one extraction batch",
+    )
     sp_extract.add_argument("--db", default=None, help="Path to Cortex database")
 
     # reflect
@@ -351,7 +355,7 @@ def _cmd_extract(args: argparse.Namespace) -> None:
             f"{result['extractions_linked']} extractions linked"
         )
     else:
-        prompt = extract_prompt(conn, scope=args.scope)
+        prompt = extract_prompt(conn, scope=args.scope, limit=args.limit)
         if prompt is None:
             print("No unextracted chunks found.", file=sys.stderr)
             sys.exit(0)

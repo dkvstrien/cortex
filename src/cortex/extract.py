@@ -55,6 +55,7 @@ Example with supersedes:
 def _get_unextracted_chunks(
     conn: sqlite3.Connection,
     scope: str = "recent",
+    limit: int | None = None,
 ) -> list[dict[str, Any]]:
     """Return raw chunks that have no entry in the extractions table.
 
@@ -63,6 +64,8 @@ def _get_unextracted_chunks(
     scope:
         'recent' — only chunks from the last 24 hours.
         'all' — all unextracted chunks.
+    limit:
+        Maximum number of chunks to return. None = no limit.
     """
     base_query = """
         SELECT rc.id, rc.content, rc.source, rc.source_type, rc.created_at
@@ -79,6 +82,10 @@ def _get_unextracted_chunks(
         params.append(cutoff)
 
     base_query += " ORDER BY rc.created_at ASC"
+
+    if limit is not None:
+        base_query += " LIMIT ?"
+        params.append(limit)
 
     rows = conn.execute(base_query, params).fetchall()
     return [
@@ -114,6 +121,7 @@ def _get_similar_existing_memories(
 def extract_prompt(
     conn: sqlite3.Connection,
     scope: str = "recent",
+    limit: int | None = None,
 ) -> str | None:
     """Generate a prompt listing unextracted raw chunks for an LLM.
 
@@ -124,12 +132,14 @@ def extract_prompt(
     scope:
         'recent' (default) — only chunks from last 24 hours.
         'all' — all unextracted chunks.
+    limit:
+        Maximum number of chunks to include in the prompt. None = all.
 
     Returns
     -------
     The prompt string, or None if there are no unextracted chunks.
     """
-    chunks = _get_unextracted_chunks(conn, scope=scope)
+    chunks = _get_unextracted_chunks(conn, scope=scope, limit=limit)
     if not chunks:
         return None
 
@@ -303,6 +313,12 @@ def main() -> None:
         action="store_true",
         help="Read extraction JSON from stdin and process it",
     )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Max number of chunks to include in one extraction batch",
+    )
     args = parser.parse_args()
 
     conn = init_db(args.db)
@@ -320,7 +336,7 @@ def main() -> None:
         )
     else:
         # Generate prompt and output to stdout
-        prompt = extract_prompt(conn, scope=args.scope)
+        prompt = extract_prompt(conn, scope=args.scope, limit=args.limit)
         if prompt is None:
             print("No unextracted chunks found.", file=sys.stderr)
             sys.exit(0)
