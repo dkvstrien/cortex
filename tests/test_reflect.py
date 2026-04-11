@@ -33,6 +33,16 @@ def _store_memory(conn, content, mem_type="preference", source="manual", tags=No
     return remember(conn, content, type=mem_type, source=source, tags=tags)
 
 
+def _store_5(conn, prefix="Memory", mem_type="preference"):
+    """Helper: store 5 curated memories (the evidence minimum) and return
+    their IDs. Use when a test just needs enough memories to clear the
+    reflect ≥5 source_ids bar, not when the specific content matters."""
+    return [
+        _store_memory(conn, f"{prefix} {i}", mem_type)
+        for i in range(1, 6)
+    ]
+
+
 # --- reflect_prompt tests ---
 
 
@@ -147,20 +157,19 @@ def test_reflect_prompt_returns_none_all_reflected(conn):
 
 def test_process_reflection_creates_insight_memories(conn):
     """process_reflection creates memories with type='insight' and source='reflect'."""
-    id1 = _store_memory(conn, "Dan prefers SQLite", "preference")
-    id2 = _store_memory(conn, "Dan uses local tools", "preference")
+    ids = _store_5(conn, "Simplicity memory")
 
     reflection = [
         {
             "content": "Dan consistently chooses simplicity over scalability",
             "type": "insight",
-            "source_ids": [id1, id2],
+            "source_ids": ids,
         }
     ]
 
     result = process_reflection(conn, reflection)
     assert result["insights_created"] == 1
-    assert result["source_ids_tracked"] == 2
+    assert result["source_ids_tracked"] == 5
 
     row = conn.execute(
         "SELECT content, type, source FROM curated_memories WHERE type = 'insight'"
@@ -173,14 +182,13 @@ def test_process_reflection_creates_insight_memories(conn):
 
 def test_process_reflection_stores_source_ids_in_tags(conn):
     """Source IDs are stored in the tags field as source:<id> entries."""
-    id1 = _store_memory(conn, "Memory A", "fact")
-    id2 = _store_memory(conn, "Memory B", "fact")
+    ids = _store_5(conn, "Tag memory", "fact")
 
     reflection = [
         {
-            "content": "Pattern from A and B",
+            "content": "Pattern across multiple memories",
             "type": "insight",
-            "source_ids": [id1, id2],
+            "source_ids": ids,
         }
     ]
 
@@ -191,39 +199,38 @@ def test_process_reflection_stores_source_ids_in_tags(conn):
     ).fetchone()
     assert row is not None
     tags = json.loads(row[0])
-    assert f"source:{id1}" in tags
-    assert f"source:{id2}" in tags
+    for i in ids:
+        assert f"source:{i}" in tags
 
 
 def test_process_reflection_tracks_source_ids_in_meta(conn):
     """process_reflection records source_ids in the meta table."""
-    id1 = _store_memory(conn, "Memory A", "preference")
-    id2 = _store_memory(conn, "Memory B", "decision")
+    ids = _store_5(conn, "Meta memory")
 
     reflection = [
         {
-            "content": "Insight from A and B",
+            "content": "Insight across the group",
             "type": "insight",
-            "source_ids": [id1, id2],
+            "source_ids": ids,
         }
     ]
 
     process_reflection(conn, reflection)
 
     reflected = _get_reflected_ids(conn)
-    assert id1 in reflected
-    assert id2 in reflected
+    for i in ids:
+        assert i in reflected
 
 
 def test_process_reflection_from_json_string(conn):
     """process_reflection accepts a JSON string as input."""
-    id1 = _store_memory(conn, "Some memory", "fact")
+    ids = _store_5(conn, "String memory", "fact")
 
     json_str = json.dumps([
         {
             "content": "Insight from string input",
             "type": "insight",
-            "source_ids": [id1],
+            "source_ids": ids,
         }
     ])
 
@@ -233,15 +240,31 @@ def test_process_reflection_from_json_string(conn):
 
 def test_process_reflection_skips_empty_content(conn):
     """Items with empty content are skipped."""
-    id1 = _store_memory(conn, "Memory", "fact")
+    ids = _store_5(conn, "Empty-content memory", "fact")
 
     reflection = [
-        {"content": "", "type": "insight", "source_ids": [id1]},
-        {"content": "   ", "type": "insight", "source_ids": [id1]},
+        {"content": "", "type": "insight", "source_ids": ids},
+        {"content": "   ", "type": "insight", "source_ids": ids},
     ]
 
     result = process_reflection(conn, reflection)
     assert result["insights_created"] == 0
+
+
+def test_process_reflection_skips_low_evidence(conn):
+    """Insights with fewer than 5 source memories are skipped."""
+    ids = _store_5(conn, "Low-evidence memory")
+    # Only use 4 of the 5 — below the evidence bar.
+    reflection = [
+        {
+            "content": "Weakly evidenced insight",
+            "type": "insight",
+            "source_ids": ids[:4],
+        }
+    ]
+    result = process_reflection(conn, reflection)
+    assert result["insights_created"] == 0
+    assert result["insights_skipped_low_evidence"] == 1
 
 
 def test_process_reflection_empty_list(conn):
@@ -259,26 +282,25 @@ def test_process_reflection_invalid_json_raises(conn):
 
 def test_process_reflection_multiple_insights(conn):
     """Multiple insights are all created."""
-    id1 = _store_memory(conn, "Memory 1", "preference")
-    id2 = _store_memory(conn, "Memory 2", "preference")
-    id3 = _store_memory(conn, "Memory 3", "decision")
+    pref_ids = _store_5(conn, "Pref memory", "preference")
+    dec_ids = _store_5(conn, "Decision memory", "decision")
 
     reflection = [
         {
             "content": "Insight about preferences",
             "type": "insight",
-            "source_ids": [id1, id2],
+            "source_ids": pref_ids,
         },
         {
             "content": "Insight about decisions",
             "type": "insight",
-            "source_ids": [id3],
+            "source_ids": dec_ids,
         },
     ]
 
     result = process_reflection(conn, reflection)
     assert result["insights_created"] == 2
-    assert result["source_ids_tracked"] == 3
+    assert result["source_ids_tracked"] == 10
 
 
 # --- meta table tracking tests ---
@@ -286,34 +308,30 @@ def test_process_reflection_multiple_insights(conn):
 
 def test_reflected_ids_persist_across_calls(conn):
     """reflected_ids accumulate across multiple process_reflection calls."""
-    id1 = _store_memory(conn, "Memory 1", "fact")
-    id2 = _store_memory(conn, "Memory 2", "fact")
-    id3 = _store_memory(conn, "Memory 3", "fact")
+    first = _store_5(conn, "Run-one memory", "fact")
+    second = _store_5(conn, "Run-two memory", "fact")
 
     process_reflection(conn, [
-        {"content": "Insight 1", "type": "insight", "source_ids": [id1]},
+        {"content": "Insight 1", "type": "insight", "source_ids": first},
     ])
     process_reflection(conn, [
-        {"content": "Insight 2", "type": "insight", "source_ids": [id2, id3]},
+        {"content": "Insight 2", "type": "insight", "source_ids": second},
     ])
 
     reflected = _get_reflected_ids(conn)
-    assert id1 in reflected
-    assert id2 in reflected
-    assert id3 in reflected
+    for i in first + second:
+        assert i in reflected
 
 
 def test_reflected_ids_exclude_from_next_prompt(conn):
     """After process_reflection, reflected source memories are excluded from future prompts."""
-    id1 = _store_memory(conn, "Already reflected memory", "preference")
-    id2 = _store_memory(conn, "Not yet reflected memory", "preference")
+    reflected_ids = _store_5(conn, "Already reflected memory", "preference")
+    pending_id = _store_memory(conn, "Not yet reflected memory", "preference")
 
-    # Reflect the first one
     process_reflection(conn, [
-        {"content": "Insight", "type": "insight", "source_ids": [id1]},
+        {"content": "Insight", "type": "insight", "source_ids": reflected_ids},
     ])
 
-    # id2 not yet reflected, should appear in prompt
     prompt = reflect_prompt(conn)
     assert prompt is not None
     assert "Already reflected memory" not in prompt
@@ -339,9 +357,13 @@ def test_save_and_get_reflected_ids_round_trip(conn):
 
 def test_full_round_trip(conn):
     """End-to-end: store memories, generate prompt, process reflection, verify tracking."""
-    id1 = _store_memory(conn, "Dan prefers SQLite over Postgres", "preference")
-    id2 = _store_memory(conn, "Dan uses uv not pip", "preference")
-    id3 = _store_memory(conn, "Dan chose ThinkPad as home server", "decision")
+    ids = [
+        _store_memory(conn, "Dan prefers SQLite over Postgres", "preference"),
+        _store_memory(conn, "Dan uses uv not pip", "preference"),
+        _store_memory(conn, "Dan chose ThinkPad as home server", "decision"),
+        _store_memory(conn, "Dan uses Syncthing to sync projects", "fact"),
+        _store_memory(conn, "Dan hosts services behind Caddy + Cloudflare", "procedure"),
+    ]
 
     # Generate prompt
     prompt = reflect_prompt(conn)
@@ -353,15 +375,15 @@ def test_full_round_trip(conn):
     # Simulate Haiku output
     haiku_output = [
         {
-            "content": "Dan consistently prefers simple, local, self-hosted solutions",
+            "content": "Pattern observed: Dan tends to prefer simple, local, self-hosted solutions",
             "type": "insight",
-            "source_ids": [id1, id2, id3],
+            "source_ids": ids,
         }
     ]
 
     result = process_reflection(conn, haiku_output)
     assert result["insights_created"] == 1
-    assert result["source_ids_tracked"] == 3
+    assert result["source_ids_tracked"] == 5
 
     # Verify insight was stored
     insight = conn.execute(
@@ -373,7 +395,7 @@ def test_full_round_trip(conn):
 
     # Verify source IDs are tracked
     reflected = _get_reflected_ids(conn)
-    assert {id1, id2, id3}.issubset(reflected)
+    assert set(ids).issubset(reflected)
 
     # Now those memories shouldn't appear in the next prompt
     prompt2 = reflect_prompt(conn)

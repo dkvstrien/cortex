@@ -26,21 +26,58 @@ _META_KEY_REFLECTED_IDS = "reflected_ids"
 
 REFLECTION_PROMPT_TEMPLATE = """\
 You are a memory insight agent. Below are curated memories grouped by type.
-Your job is to synthesize higher-level patterns and insights from them.
+Your job is to synthesize HIGH-CONFIDENCE patterns across the group.
 
-Look for recurring themes, contradictions, or notable patterns across the memories.
-Each insight should be a concise, standalone observation worth remembering — something
-that isn't obvious from any single memory but emerges from the group.
+These insights will be read by a future Claude instance working with the
+user. Insights that are over-general, too literal, or thinly evidenced
+cause real downstream harm: future Claude may interpret them as rules
+and follow them rigidly when it shouldn't. Err strongly on the side of
+fewer, stronger insights.
 
-Return ONLY a JSON array (no markdown, no explanation) in this format:
+## What counts as a good insight
+
+- **Observational, not prescriptive.** Describe patterns in how Dan works.
+  Never frame as a directive for future Claude to follow.
+  - GOOD: "Pattern observed: across multi-day projects, Dan tends to
+    prefer shipping incrementally over planning exhaustively upfront."
+  - BAD: "Systems should ship incrementally and avoid upfront planning."
+- **Hedged language.** Use "tends to", "often", "in this sample",
+  "observed pattern". Never "always", "never", "should", "must".
+- **Well-evidenced.** Requires at least 5 source memories that clearly
+  support the same pattern. Three memories is not enough — two could
+  be coincidence, five is a trend.
+- **Non-trivial.** Something a future Claude wouldn't figure out from
+  any single memory or from general priors about software engineers.
+  "Dan uses git" is not an insight.
+- **Durable.** Still likely true in six months. Skip patterns that
+  depend on the current state of one specific project.
+
+## Hard rules
+
+1. If fewer than 5 source memories clearly support a pattern, DO NOT
+   emit it. Return a smaller array, or [].
+2. Never invent themes that aren't directly supported by the listed
+   memories. If the evidence isn't there, don't reach.
+3. Quality over quantity. 3 strong insights beat 10 weak ones.
+   Returning [] is a valid and correct answer when the sample is thin.
+4. Never contradict a memory you cite. If memories disagree, either
+   note the tension explicitly or skip the pattern entirely.
+
+## Output format
+
+Return ONLY a JSON array (no markdown fences, no prose):
 [
-  {{"content": "Dan consistently chooses local-first tools over cloud services", "type": "insight", "source_ids": [1, 4, 7]}},
-  {{"content": "Dan values automation but prefers manual triggers over scheduled agents", "type": "insight", "source_ids": [2, 3, 8]}}
+  {{
+    "content": "Pattern observed: Dan tends to prefer local-first tools over cloud services across infrastructure, note-taking, and media — often citing operational control and token/cost efficiency",
+    "type": "insight",
+    "source_ids": [12, 44, 87, 103, 156, 201]
+  }}
 ]
 
 - type must always be "insight"
 - source_ids must reference IDs from the memories listed below
-- If no meaningful patterns emerge, return an empty array: []
+- Minimum 5 source_ids per insight
+- If nothing meets the bar, return: []
 
 --- CURATED MEMORIES BY TYPE ---
 
@@ -182,6 +219,7 @@ def process_reflection(
         raise ValueError("Reflection JSON must be a list of objects")
 
     insights_created = 0
+    insights_skipped_low_evidence = 0
     all_source_ids: set[int] = set()
 
     for item in data:
@@ -189,6 +227,16 @@ def process_reflection(
         source_ids = [int(i) for i in item.get("source_ids", [])]
 
         if not content:
+            continue
+
+        # Enforce the ≥5 source-memory evidence bar. The prompt asks for
+        # it, but an LLM can drift — back-stop in code.
+        if len(source_ids) < 5:
+            insights_skipped_low_evidence += 1
+            logger.debug(
+                "Skipping insight with only %d source memories: %r",
+                len(source_ids), content[:80],
+            )
             continue
 
         # Store source_ids as JSON array in the tags field
@@ -217,6 +265,7 @@ def process_reflection(
     return {
         "insights_created": insights_created,
         "source_ids_tracked": len(all_source_ids),
+        "insights_skipped_low_evidence": insights_skipped_low_evidence,
     }
 
 
